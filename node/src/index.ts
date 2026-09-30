@@ -17,3 +17,4 @@ export * from "./kernel.ts";
 export * from "./work.ts";
 
 export * from "./activation.ts";
+export * from "./evidence-identity.ts";

@@ -17,7 +17,7 @@ import { hooks } from "./internal-hooks.ts";
 import { createHash } from "node:crypto";
 import { hashPayload, orderedObject, pyJsonDumps, type JsonValue } from "./encoding.ts";
 import { parseLossless } from "./json.ts";
-import { normalizeIdentityV1 } from "./text.ts";
+import { identitySegment } from "./evidence-identity.ts";
 import { utcNowSeconds } from "./encoding.ts";
 import {
   addCue,
@@ -122,13 +122,6 @@ function verifyConnection(database: DatabaseSync, writable: boolean): void {
 
 function hasTable(database: DatabaseSync, name: string): boolean {
   return Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
-}
-function identitySegment(value: string, fallback: string): string {
-  const normalized = normalizeIdentityV1(value)
-    .trim()
-    .replace(/[^a-z0-9._/-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
-  return normalized || fallback;
 }
 function plainJson(value: JsonValue): unknown {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;

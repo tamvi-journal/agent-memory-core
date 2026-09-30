@@ -14,8 +14,9 @@ import {
   type PyInt,
 } from "./encoding.ts";
 import { parseLossless } from "./json.ts";
-import { normalizeIdentityV1, normalizeText } from "./text.ts";
+import { normalizeText } from "./text.ts";
 import { hooks } from "./internal-hooks.ts";
+import { canonicalEvidenceIdentity } from "./evidence-identity.ts";
 import type { MemoryStore, Row } from "./store.ts";
 
 export type Numeric = number | PyInt | PyFloat;
@@ -35,18 +36,6 @@ const row = (db: DatabaseSync, sql: string, ...args: (string | number | bigint)[
 const rows = (db: DatabaseSync, sql: string, ...args: (string | number | bigint)[]) =>
   db.prepare(sql).all(...args) as Row[];
 
-function identitySegment(value: string, fallback: string): string {
-  const normalized = normalizeIdentityV1(value)
-    .trim()
-    .replace(/[^a-z0-9._/-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
-  return normalized || fallback;
-}
-
-function defaultPayload(value: unknown): JsonValue {
-  return toJsonValue(value);
-}
-
 export function semanticHash(value: Record<string, unknown>): string {
   return hashPayload(
     orderedObject([
@@ -61,20 +50,15 @@ export function semanticHash(value: Record<string, unknown>): string {
 }
 
 export function insertEvidence(store: MemoryStore, db: DatabaseSync, source: Evidence): string {
-  const sourceRef = String(source.source_ref ?? "").trim();
-  const inferred = sourceRef.includes(":") ? sourceRef.split(":", 1)[0] : sourceRef;
-  const family = identitySegment(String(source.source_family ?? inferred), "unknown-source");
-  const group = identitySegment(String(source.independence_group ?? (sourceRef || family)), family);
-  const payload = source.source_payload ?? { source_ref: sourceRef, content_summary: source.content_summary ?? "" };
-  const sourceSha = hashPayload(defaultPayload(payload));
-  const version = String(source.identity_version ?? "evidence-v2");
-  const identity = orderedObject([
-    ["identity_version", version],
-    ["source_family", family],
-    ["independence_group", group],
-    ["source_sha256", sourceSha],
-  ]);
-  const evidenceSha = hashPayload(identity);
+  // Python stores evidence.get("source_ref", "") as given (unstripped).
+  const sourceRef = String(source.source_ref ?? "");
+  const {
+    identity_version: version,
+    source_family: family,
+    independence_group: group,
+    source_sha256: sourceSha,
+    evidence_sha256: evidenceSha,
+  } = canonicalEvidenceIdentity(source);
   const evidenceId = `evidence:${version}:${evidenceSha.slice(0, 32)}`;
   db.prepare(
     "INSERT INTO memory_evidence_v3(evidence_id,identity_version,evidence_type,source_ref,source_family,independence_group,source_sha256,evidence_sha256,captured_at,actor,surface,model_family,content_summary,confidence,privacy_class) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(identity_version,evidence_sha256) DO NOTHING",
@@ -87,7 +71,7 @@ export function insertEvidence(store: MemoryStore, db: DatabaseSync, source: Evi
     group,
     sourceSha,
     evidenceSha,
-    String(source.captured_at ?? store.now()),
+    String(source.captured_at || store.now()), // Python: evidence.get("captured_at") or utc_now()
     String(source.actor ?? ""),
     String(source.surface ?? ""),
     String(source.model_family ?? ""),
