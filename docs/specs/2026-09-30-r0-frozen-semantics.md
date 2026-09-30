@@ -41,8 +41,9 @@ These were probed on Python 3.11.15 / Unicode 14.0.0 and Node 22. Each one is a 
 - **Connection pragmas.**
   - `foreign_keys=ON` on every connection.
   - **Journal mode is asserted, not assumed (F2).** The declared mode is `DELETE`. A persisted mode can differ in an existing file (WAL is stored in the header), so:
-    - on a writable open, the runtime reads `PRAGMA journal_mode`; if it is not `delete`, it sets `PRAGMA journal_mode=DELETE` deliberately and verifies the result, failing closed if SQLite refuses;
-    - on a read-only open, a persisted `wal` mode, or a `-wal`/`-shm` sidecar next to the file, fails closed with a typed error (`IncompatibleJournalMode`) that names the explicit repair command. Read paths never convert;
+    - **the decision is made before SQLite opens the file**, from the header bytes: magic `SQLite format 3\0`, write/read versions at bytes 18/19 (2 = WAL), `user_version` at 60–63 and `application_id` at 68–71 (big-endian). Opening a WAL database, even `mode=ro`, can create `-wal`/`-shm` sidecars that stay behind, so a read that refuses must refuse before the open;
+    - on a writable open, a foreign `application_id` or a `user_version` above 4 is refused before the open. Otherwise the runtime reads `PRAGMA journal_mode`; if it is not `delete`, it sets `PRAGMA journal_mode=DELETE` deliberately and verifies the result, failing closed if SQLite refuses;
+    - on a read-only open, a WAL header, or a `-wal`/`-shm` sidecar next to the file, fails closed before the open with a typed error (`IncompatibleJournalMode`) that names the explicit repair command. Read paths never convert;
     - the oracle gets the same check, shipped with P3's PR as a fail-closed guard that changes no stored data.
   - Busy timeout is 5000 ms, matching Python's `sqlite3.connect` default.
 - **Opening rules** (same as the oracle):
@@ -214,17 +215,18 @@ tokens(v) = [p for p in normalize_text(v).split(" ") if len(p) > 1]
 
 So the whole function is `concat(M(c) for c in v)` for a per-code-point map `M`, followed by the token regex. `M(c)` is a string over `[a-z0-9_]` plus a separator.
 
-**Contract:** text-norm/v2 and identity-v1 are **defined by tables generated once from the oracle** on Python 3.11 (Unicode 14.0.0). These are `spec/tables/text-norm-v2.json` and `spec/tables/identity-v1.json`.
+**Contract:** text-norm/v2 and identity-v1 are **defined by tables generated once from the oracle** on Python 3.11 (Unicode 14.0.0). These are `memory_core/tables/text-norm-v2.json` and `memory_core/tables/identity-v1.json`. They are package data next to `schema.sql`, so every install carries them, including the vendored Claude `.plugin`.
 
 - Each table stores only the code points that do not map to "separator":
   - `c → "tokenchars"`, for example `ễ → "e"` and `𝐀 → "a"`;
   - `c → ""` for a code point that is dropped and so joins its neighbours, for example U+0301;
-  - `c → "a b"` for a code point whose mapping contains an internal separator, for example `¼ → "1 4"`.
+  - `c → "a b"` for a code point whose mapping contains an internal separator, for example `¼ → "1 4"`;
+  - separators at either **end** of the mapping are kept as a space, because they split the code point from its neighbours: `⑴ → " 1 "`, so `a⑴b` normalizes to `a 1 b`, not `a1b`. In general the value is the exact per-code-point output with every run of non-token characters written as one space (found by Codex in R0b).
 - Every code point not in the table is a separator.
 - Surrogates are excluded, because lone surrogates are rejected at input.
 - **Table format and integrity.** Each table file is `{"schema": "trajecta.norm-table/v1", "name": "text-norm/v2" | "identity-v1", "unicode": "14.0.0", "generator": {...}, "map": {"<hex code point>": "<output>"}}`. Its sha256 is recorded in `spec/golden/MANIFEST.json` and pinned as a constant in both runtimes. Each runtime verifies the digest when it loads the table and refuses to start on a mismatch.
 - **Both runtimes use the table.** Oracle patch P3 makes the Python functions table-driven, so Python 3.10 / 3.13 CI stops drifting (H9).
-- A code point whose mapping differs between Unicode 13, 14, 15.1 and 17 is listed in `spec/tables/version-sensitive.json` for review. The frozen table wins.
+- A code point whose mapping differs between Unicode 13, 14, 15.1 and 17 is listed in `memory_core/tables/version-sensitive.json` for review. The frozen table wins.
 - The version string stays `text-norm/v2`, and stored `cue_norm` values are unchanged:
   - the oracle recomputes `cue_norm` from the raw cue at query time;
   - for every code point that exists in Unicode 14, the table is identical to Python 3.11.
@@ -494,7 +496,7 @@ For each scenario it writes `spec/golden/<scenario>/`:
 `spec/golden/MANIFEST.json` holds:
 
 - the sha256 of every file, including the two normalizer tables;
-- the oracle commit;
+- oracle provenance: `oracle_base_commit` (`def576d`), `oracle_semantics` (the R0b patch list: P1, P2, P3, F2) and `oracle_source_sha256` over the per-file sha256 of every source whose behaviour reaches the artifacts (`memory_core`, the identity modules used by the scenarios, the example profile, and both generators). A commit that predates the patches is never named as the oracle;
 - the Python version, the Unicode version and Python's `sqlite3.sqlite_version`;
 - for conformance runs, the Node version and the `node:sqlite` SQLite version.
 
@@ -562,6 +564,8 @@ The TS conformance tests read each scenario:
 
 - R1 runs every read case against a **copy** of `store.sqlite3`, and asserts that the original's bytes are unchanged.
 - R2 replays the scenario's write script from an empty store with the same injected clock and ids, then compares `dump.json` exactly.
+  - In R0b the write sequence lives in `tools/golden/generate.py`. At the start of R2 each scenario gains a language-neutral `script.json` (the ordered write calls with their raw JSON arguments), emitted by the generator and covered by the MANIFEST, so the TS writer replays data rather than Python source.
+- R1 adds its own fail-closed fixtures for F2 (a WAL-mode header and `-wal`/`-shm` sidecars), built in the test, since R0b's corpus stores are all in `DELETE` mode.
 
 ### 9.4 Tolerances
 

@@ -27,6 +27,10 @@ class MigrationRequiredError(SchemaVersionError):
     """The database is a recognized legacy store and needs explicit migration."""
 
 
+class IncompatibleJournalMode(SchemaVersionError):
+    """The store must be explicitly repaired before a read can continue."""
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -111,17 +115,80 @@ class MemoryStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
 
+    def _preflight(self, *, readonly: bool) -> None:
+        """Refuse WAL and foreign files before SQLite ever opens them.
+
+        Opening a WAL database, even ``mode=ro``, can create ``-wal``/``-shm``
+        sidecars, and a writable open of a file this store does not own could
+        leave them behind on a crash. So the decision is made from the file
+        header bytes alone; the PRAGMA checks after open stay as defense in
+        depth.
+        """
+
+        repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
+        resolved = self.db_path.resolve()
+        if readonly and any(
+            Path(f"{resolved}{suffix}").exists() for suffix in ("-wal", "-shm")
+        ):
+            raise IncompatibleJournalMode(f"SQLite WAL sidecar present. {repair}")
+        try:
+            with open(resolved, "rb") as handle:
+                header = handle.read(100)
+        except FileNotFoundError:
+            return
+        if len(header) < 100 or header[:16] != b"SQLite format 3\x00":
+            # Empty or not a SQLite file: nothing to decide from the header;
+            # SQLite itself reports it (an empty file is an empty database).
+            return
+        wal = header[18] == 2 or header[19] == 2
+        user_version = int.from_bytes(header[60:64], "big", signed=True)
+        application_id = int.from_bytes(header[68:72], "big", signed=True)
+        if readonly:
+            if wal:
+                raise IncompatibleJournalMode(f"SQLite journal_mode=wal. {repair}")
+            return
+        if application_id not in {0, APPLICATION_ID} or user_version > SCHEMA_VERSION:
+            raise SchemaVersionError(
+                "database application_id/user_version is newer or foreign"
+            )
+
     @contextmanager
     def _raw_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
+        repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
+        resolved = self.db_path.resolve()
+        self._preflight(readonly=readonly)
         if readonly:
-            uri = f"{self.db_path.resolve().as_uri()}?mode=ro"
+            uri = f"{resolved.as_uri()}?mode=ro"
             conn = sqlite3.connect(uri, uri=True)
         else:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys=ON")
         try:
+            conn.execute("PRAGMA foreign_keys=ON")
+            mode = str(conn.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+            if readonly:
+                if mode == "wal":
+                    raise IncompatibleJournalMode(f"SQLite journal_mode=wal. {repair}")
+            elif mode != "delete":
+                # Never rewrite the header of a database this store does not
+                # own: a foreign or future file is refused untouched.
+                application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
+                user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+                if application_id not in {0, APPLICATION_ID} or user_version > SCHEMA_VERSION:
+                    raise SchemaVersionError(
+                        "database application_id/user_version is newer or foreign"
+                    )
+                try:
+                    mode = str(conn.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower()
+                except sqlite3.Error as exc:
+                    raise IncompatibleJournalMode(
+                        f"SQLite refused journal_mode=DELETE. {repair}"
+                    ) from exc
+                if mode != "delete":
+                    raise IncompatibleJournalMode(
+                        f"SQLite refused journal_mode=DELETE (got {mode}). {repair}"
+                    )
             if readonly:
                 yield conn
             else:
@@ -188,6 +255,10 @@ class MemoryStore:
         remains for existing consumers, but it is only used on write paths.
         """
 
+        # initialize is a writable open, so reconcile a persisted WAL header
+        # before schema_info performs its fail-closed read.
+        with self._raw_connect():
+            pass
         before = self.schema_info()
         if before["state"] == "ready":
             return {**before, "changed": False}
@@ -339,7 +410,7 @@ class MemoryStore:
         with self.connect(readonly=True) as conn:
             rows = conn.execute(
                 "SELECT * FROM memory_cues_v3 WHERE profile=? "
-                "AND scope IN ('global',?) ORDER BY weight DESC",
+                "AND scope IN ('global',?) ORDER BY weight DESC, cue_id",
                 (profile, scope),
             ).fetchall()
         return [dict(row) for row in rows]

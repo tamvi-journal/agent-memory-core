@@ -34,7 +34,7 @@ Documentation = "https://github.com/tamvi-journal/trajecta-identity-memory/tree/
 include = ["memory_core*", "trajecta_identity*"]
 
 [tool.setuptools.package-data]
-memory_core = ["schema.sql"]
+memory_core = ["schema.sql", "tables/*.json"]
 trajecta_identity = ["profiles/*/profile.json", "profiles/SETUP.md"]
 
 [tool.pytest.ini_options]

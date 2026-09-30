@@ -159,7 +159,7 @@ class CueDrivenRetriever:
                 scores[record_id] += 0.34
                 reasons[record_id].append("bootstrap")
 
-        frontier = {record_id: scores[record_id] for record_id in direct}
+        frontier = {record_id: scores[record_id] for record_id in sorted(direct)}
         for depth in (1, 2):
             next_frontier: dict[str, float] = {}
             for source_id, activation in frontier.items():
