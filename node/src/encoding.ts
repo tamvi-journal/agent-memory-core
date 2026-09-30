@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type PyInt = { kind: "int"; value: bigint; text?: string };
 export type PyFloat = { kind: "float"; value: number; text?: string };
@@ -168,21 +171,52 @@ export function utcNowSeconds(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/u, "+00:00");
 }
 
-const CASED = /[\p{Lu}\p{Ll}\p{Lt}]/u;
+const TITLE_TABLE = "py-title-u14.json";
+const TITLE_SHA256 = "1ce9996ab9e3dad9cda2cee963f66c7fe23f0c18d14420b6a3e5aa0fb6a0031a";
+let titleTable: { cased: [number, number][]; title: Record<string, string>; lower: Record<string, string> } | null = null;
+
+function loadTitleTable() {
+  if (titleTable) return titleTable;
+  const raw = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "tables", TITLE_TABLE));
+  const actual = createHash("sha256").update(raw).digest("hex");
+  if (actual !== TITLE_SHA256) throw new Error(`title table ${TITLE_TABLE} sha256 mismatch: ${actual}`);
+  const payload = JSON.parse(raw.toString("utf8"));
+  if (payload.schema !== "trajecta.py-title-table/v1" || payload.unicode !== "14.0.0") {
+    throw new Error(`title table ${TITLE_TABLE} has invalid metadata`);
+  }
+  titleTable = { cased: payload.cased, title: payload.title, lower: payload.lower };
+  return titleTable;
+}
+
+function isCased(cp: number): boolean {
+  const ranges = loadTitleTable().cased;
+  let low = 0;
+  let high = ranges.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const [first, last] = ranges[middle];
+    if (cp < first) high = middle - 1;
+    else if (cp > last) low = middle + 1;
+    else return true;
+  }
+  return false;
+}
 
 /**
- * Python `str.title()`: a cased character that follows an uncased one is
- * title-cased, every other cased character is lower-cased. Exact for the
- * ASCII and ordinary Latin domains in use; titlecase digraphs (U+01C4..)
- * are an accepted difference.
+ * Python 3.11 `str.title()` (Unicode 14), from a table frozen from the
+ * oracle (tools/title_table/generate.py): after a Cased character, the full
+ * lowercase mapping; otherwise the full titlecase mapping. "Cased" is the
+ * derived property (includes Other_Lowercase such as U+00AA and U+24B6..).
  */
 export function pyTitle(value: string): string {
+  const table = loadTitleTable();
   let previousCased = false;
   let result = "";
   for (const char of value) {
-    const cased = CASED.test(char);
-    result += cased ? (previousCased ? char.toLowerCase() : char.toUpperCase()) : char;
-    previousCased = cased;
+    const cp = char.codePointAt(0)!;
+    const key = cp.toString(16);
+    result += previousCased ? (table.lower[key] ?? char) : (table.title[key] ?? char);
+    previousCased = isCased(cp);
   }
   return result;
 }

@@ -2,6 +2,7 @@ import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { IncompatibleJournalMode, MigrationRequired, SchemaVersionError } from "./errors.ts";
+import { hooks } from "./internal-hooks.ts";
 
 export const APPLICATION_ID = 0x414d4333;
 export const SCHEMA_VERSION = 4;
@@ -57,6 +58,35 @@ function preflight(path: string): Header {
   return header;
 }
 
+type Facts = { applicationId: number; userVersion: number; tables: Set<unknown> };
+
+/** PRAGMA application_id / user_version and table names, from an open database. */
+function inspect(database: DatabaseSync): Facts {
+  const pragma = (name: string): number => Number((database.prepare(`PRAGMA ${name}`).get() as Record<string, unknown>)[name]);
+  const tables = new Set((database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Row[]).map((row) => row.name));
+  return { applicationId: pragma("application_id"), userVersion: pragma("user_version"), tables };
+}
+
+/** Python `schema_info` state. */
+export function classify({ applicationId, userVersion, tables }: Facts): string {
+  if (applicationId === APPLICATION_ID && userVersion === SCHEMA_VERSION) return "ready";
+  if (userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(applicationId)) return "incompatible";
+  if (tables.has("memory_records_v2")) return "legacy-v2";
+  if (applicationId === APPLICATION_ID && userVersion === LEGACY_V3_VERSION) return "legacy-v3";
+  return "unknown";
+}
+
+/** Python `_assert_schema`, with the corpus messages. */
+function assertSchema(facts: Facts): void {
+  switch (classify(facts)) {
+    case "ready": return;
+    case "incompatible": throw new SchemaVersionError("database is newer than this runtime or belongs to another application");
+    case "legacy-v2": throw new MigrationRequired("legacy v2 store must be initialized or migrated before use");
+    case "legacy-v3": throw new MigrationRequired("schema v3 store must be initialized or migrated to v4 before use");
+    default: throw new SchemaVersionError("memory database is not initialized");
+  }
+}
+
 export class MemoryStore {
   readonly path: string;
   #database: DatabaseSync | null = null;
@@ -68,20 +98,21 @@ export class MemoryStore {
   open(): DatabaseSync | null {
     if (this.#database) return this.#database;
     if (!this.exists()) return null;
-    const header = preflight(this.path);
+    // Stage 1, side-effect free: refuse WAL, foreign and future files from
+    // the header before SQLite touches the file.
+    preflight(this.path);
+    hooks.beforeOpen?.(this.path);
     const database = new DatabaseSync(this.path, { readOnly: true, enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       const foreignKeys = database.prepare("PRAGMA foreign_keys").get() as Record<string, unknown>;
       if (Number(foreignKeys.foreign_keys) !== 1) throw new Error("SQLite foreign_keys is not enabled");
       const mode = String((database.prepare("PRAGMA journal_mode").get() as Record<string, unknown>).journal_mode).toLowerCase();
       if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite journal_mode=${mode}. ${REPAIR}`);
-      if (header.applicationId === APPLICATION_ID && header.userVersion === SCHEMA_VERSION) {
-        this.#database = database;
-        return database;
-      }
-      const tables = new Set((database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Row[]).map((row) => row.name));
-      if (tables.has("memory_records_v2")) throw new MigrationRequired("legacy v2 store must be initialized or migrated before use");
-      throw new SchemaVersionError("memory database is not initialized");
+      // Stage 2, authoritative (Python `_assert_schema`): classify from the
+      // database actually opened, not from the header read before the open.
+      assertSchema(inspect(database));
+      this.#database = database;
+      return database;
     } catch (error) {
       database.close();
       throw error;
@@ -139,23 +170,14 @@ export class MemoryStore {
    */
   schemaInfo(): { application_id: number; user_version: number; state: string } {
     if (!this.exists()) return { application_id: 0, user_version: 0, state: "uninitialized" };
-    const header = readHeader(this.path);
-    const { applicationId, userVersion } = header;
-    let tables = new Set<unknown>();
-    if (!header.empty) {
-      const database = new DatabaseSync(this.path, { readOnly: true, timeout: 5000 });
-      try {
-        tables = new Set((database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Row[]).map((row) => row.name));
-      } finally {
-        database.close();
-      }
+    readHeader(this.path);
+    hooks.beforeOpen?.(this.path);
+    const database = new DatabaseSync(this.path, { readOnly: true, timeout: 5000 });
+    try {
+      const facts = inspect(database);
+      return { application_id: facts.applicationId, user_version: facts.userVersion, state: classify(facts) };
+    } finally {
+      database.close();
     }
-    let state: string;
-    if (applicationId === APPLICATION_ID && userVersion === SCHEMA_VERSION) state = "ready";
-    else if (userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(applicationId)) state = "incompatible";
-    else if (tables.has("memory_records_v2")) state = "legacy-v2";
-    else if (applicationId === APPLICATION_ID && userVersion === LEGACY_V3_VERSION) state = "legacy-v3";
-    else state = "unknown";
-    return { application_id: applicationId, user_version: userVersion, state };
   }
 }

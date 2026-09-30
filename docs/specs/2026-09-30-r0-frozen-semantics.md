@@ -310,7 +310,7 @@ For each candidate in iteration order that is not dormant:
 - **Join:** `"\n".join(lines).strip() + "\n"`. Python `strip()` removes whitespace per its own definition, so the TS runtime uses the §4.6 set plus Python's `str.strip` set, which is the same.
 - **Sections:**
   - follow the profile `section_order`, then any other domains sorted by code point;
-  - the label is the profile label, or the domain with `_` replaced by a space and title-cased by Python `str.title()` (the corpus pins this for the ASCII domains in use).
+  - the label is the profile label, or the domain with `_` replaced by a space and title-cased by Python `str.title()`. For the TS port this is frozen, like the normalizers, as `node/tables/py-title-u14.json` (Python 3.11 / Unicode 14: the derived Cased property plus full title and lower mappings, e.g. `ǆ → ǅ`, `ß → Ss`, `ª` cased). `tests/test_title_table.py` checks it against live Python 3.11, and the output must be byte-exact for any domain, not only the ASCII ones in the corpus.
 - **Hit block:**
   - the heading is the title;
   - the next line is `summary`, or `content[:350]` when the summary is empty;
