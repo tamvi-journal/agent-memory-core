@@ -563,6 +563,8 @@ The TS conformance tests read each scenario:
 
 - R1 runs every read case against a **copy** of `store.sqlite3`, and asserts that the original's bytes are unchanged.
 - R2 replays the scenario's write script from an empty store with the same injected clock and ids, then compares `dump.json` exactly.
+  - In R0b the write sequence lives in `tools/golden/generate.py`. At the start of R2 each scenario gains a language-neutral `script.json` (the ordered write calls with their raw JSON arguments), emitted by the generator and covered by the MANIFEST, so the TS writer replays data rather than Python source.
+- R1 adds its own fail-closed fixtures for F2 (a WAL-mode header and `-wal`/`-shm` sidecars), built in the test, since R0b's corpus stores are all in `DELETE` mode.
 
 ### 9.4 Tolerances
 
