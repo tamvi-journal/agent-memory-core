@@ -110,4 +110,3 @@ def legacy_runtime_submit(store: MemoryStore):
 
 def legacy_intake_submit(store: MemoryStore):
     return ValidatedIntake(store, surface="r2b-test").submit(record_id="fact:belief")
-
