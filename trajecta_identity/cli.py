@@ -132,6 +132,19 @@ def parser() -> argparse.ArgumentParser:
     return root
 
 
+def _settle(receipt: dict, issue_only: bool, consume) -> dict:
+    """R2a §4.2: after a receipt exists, --issue-only returns it; otherwise consume
+    inline once. On any consume failure the durable receipt_id goes to stderr and
+    the exact typed failure is the exit text (no retry, no second receipt)."""
+    if issue_only:
+        return {"receipt_id": receipt["receipt_id"], "status": "issued"}
+    try:
+        return consume(receipt["receipt_id"])
+    except Exception as exc:
+        print(receipt["receipt_id"], file=sys.stderr)
+        raise SystemExit(f"{type(exc).__name__}: {exc}") from exc
+
+
 def main(argv: list[str] | None = None) -> None:
     utf8_stdio()
     args = parser().parse_args(argv)
@@ -224,32 +237,17 @@ def main(argv: list[str] | None = None) -> None:
             stdin=sys.stdin,
             stdout=sys.stdout,
         )
-        if args.issue_only:
-            result = {"receipt_id": receipt["receipt_id"], "status": "issued"}
-        else:
-            try:
-                result = memory.identity_core_apply(receipt["receipt_id"])
-            except Exception as exc:
-                print(receipt["receipt_id"], file=sys.stderr)
-                raise SystemExit(f"{type(exc).__name__}: {exc}") from exc
+        result = _settle(receipt, args.issue_only, memory.identity_core_apply)
     elif command == "approve-retract":
         receipt = memory.issue_retract_receipt(
             args.record_id, reason=args.reason, stdin=sys.stdin, stdout=sys.stdout
         )
-        result = (
-            {"receipt_id": receipt["receipt_id"], "status": "issued"}
-            if args.issue_only
-            else memory.identity_retract(receipt["receipt_id"])
-        )
+        result = _settle(receipt, args.issue_only, memory.identity_retract)
     elif command == "close-legacy-discussion":
         receipt = memory.issue_legacy_close_receipt(
             note=args.note, stdin=sys.stdin, stdout=sys.stdout
         )
-        result = (
-            {"receipt_id": receipt["receipt_id"], "status": "issued"}
-            if args.issue_only
-            else memory.identity_close_legacy_discussion(receipt["receipt_id"])
-        )
+        result = _settle(receipt, args.issue_only, memory.identity_close_legacy_discussion)
     elif command == "apply-receipt":
         result = memory.apply_receipt(args.receipt_id)
     elif command == "close-loop":
