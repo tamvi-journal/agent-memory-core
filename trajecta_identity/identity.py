@@ -117,6 +117,7 @@ class IdentityMemory:
     def bootstrap(self) -> dict[str, Any]:
         """Idempotent: anchors, the shared VHO seed, and the profile's core."""
 
+        self.store.require_writable(allow_uninitialized=True)
         self.store.initialize()
         results = {}
         with self.store._bootstrap_writes():
@@ -205,6 +206,7 @@ class IdentityMemory:
     ) -> dict[str, Any]:
         """Log one phase. Never supersedes anything."""
 
+        self.store.require_writable()
         record_id = "phase:" + _check_id(event_id, "event_id")
         links = self._require_existing(
             {"later-phase-of": follows, "caused-by": caused_by, "depends-on": depends_on}
@@ -256,6 +258,7 @@ class IdentityMemory:
     ) -> dict[str, Any]:
         """Create a fact, or revise it. The previous revision stays as history."""
 
+        self.store.require_writable()
         record_id = "fact:" + _check_id(fact_id, "fact_id")
         links = self._require_existing({"caused-by": caused_by, "depends-on": depends_on})
         current = self.store.current_view(record_id) if self.db_path.exists() else []
@@ -305,6 +308,7 @@ class IdentityMemory:
     ) -> dict[str, Any]:
         """Append a proposal; never mutate the canonical core."""
 
+        self.store.require_writable()
         if not str(reason).strip():
             raise ValueError("a core proposal needs a reason")
         if not isinstance(phase_context, dict) or not phase_context:
@@ -441,6 +445,7 @@ class IdentityMemory:
         stdin,
         stdout,
     ) -> dict[str, Any]:
+        self.store.require_writable()
         if outcome not in {"apply", "reject"}:
             raise ValueError("outcome must be apply or reject")
         with self.store.connect(readonly=True) as conn:
@@ -483,6 +488,7 @@ class IdentityMemory:
     def issue_retract_receipt(
         self, record_id: str, *, reason: str, stdin, stdout
     ) -> dict[str, Any]:
+        self.store.require_writable()
         if record_id in PINNED:
             raise ValueError("core, ontology and anchors cannot be retracted")
         current = self.store.current_view(record_id)
@@ -503,6 +509,7 @@ class IdentityMemory:
         return self._issue_receipt("identity_retract", binding)
 
     def issue_legacy_close_receipt(self, *, note: str, stdin, stdout) -> dict[str, Any]:
+        self.store.require_writable()
         current = self.store.current_view(CORE_ID)
         with self.store.connect(readonly=True) as conn:
             relation = conn.execute(
@@ -633,6 +640,7 @@ class IdentityMemory:
         return proposal
 
     def identity_core_apply(self, receipt_id: str) -> dict[str, Any]:
+        self.store.require_writable()
         with self.store.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             receipt, binding = self._receipt_in(conn, receipt_id, "identity_core_revision")
@@ -738,6 +746,7 @@ class IdentityMemory:
             return self.store._operation_result(conn, operation)
 
     def identity_retract(self, receipt_id: str) -> dict[str, Any]:
+        self.store.require_writable()
         with self.store.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             receipt, binding = self._receipt_in(conn, receipt_id, "identity_retract")
@@ -794,6 +803,7 @@ class IdentityMemory:
             return self.store._operation_result(conn, operation)
 
     def identity_close_legacy_discussion(self, receipt_id: str) -> dict[str, Any]:
+        self.store.require_writable()
         with self.store.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             receipt, binding = self._receipt_in(
@@ -856,6 +866,7 @@ class IdentityMemory:
             return self.store._operation_result(conn, operation)
 
     def apply_receipt(self, receipt_id: str) -> dict[str, Any]:
+        self.store.require_writable()
         with self.store.connect(readonly=True) as conn:
             receipt = conn.execute(
                 "SELECT purpose FROM memory_owner_receipts_v5 WHERE receipt_id=?",
@@ -870,6 +881,7 @@ class IdentityMemory:
         }[receipt["purpose"]](receipt_id)
 
     def close_loop(self, record_id: str, *, note: str, actor: str | None = None) -> dict[str, Any]:
+        self.store.require_writable()
         return self.store.retract_relation(
             from_record_id=record_id,
             to_record_id=OPEN_LOOP_ANCHOR,
@@ -1027,11 +1039,13 @@ class IdentityMemory:
         return linked
 
     def decay(self, now: str | None = None) -> dict[str, Any]:
+        self.store.require_writable()
         return run_decay(self.store, self.activation, pinned=PINNED, now=now)
 
     # --------------------------------------------------------------- helpers
 
     def _submit(self, *, skip_if_exists: bool = False, falsifier: str = "", **proposal: Any) -> str:
+        self.store.require_writable()
         if skip_if_exists and self.store.current_view(proposal["record_id"]):
             return "exists"
         intake = self.runtime.submit(

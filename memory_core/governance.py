@@ -55,6 +55,7 @@ class ValidatedIntake:
         }
 
     def submit(self, **proposal: Any) -> dict[str, Any]:
+        self.store.require_writable()
         payload = self._normalized_proposal(proposal, require_key=True)
         self.store._guard_pinned(payload["record_id"])
         self.store.init()

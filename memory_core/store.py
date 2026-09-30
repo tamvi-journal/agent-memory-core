@@ -135,6 +135,25 @@ class MemoryStore:
         if self._bootstrap_depth == 0 and record_id in self.pinned_guard:
             raise PinnedRecordError(f"public writer refuses pinned record_id {record_id!r}")
 
+    def require_writable(self, *, allow_uninitialized: bool = False) -> dict[str, Any]:
+        """Reject a public mutation before validation, replay, or writable open."""
+
+        info = self.schema_info()
+        state = info["state"]
+        if state == "ready" or (allow_uninitialized and state == "uninitialized"):
+            return info
+        if state == "legacy-v4":
+            raise MigrationRequiredError(
+                "schema v4 store must be migrated to v5 before writing"
+            )
+        if state in {"legacy-v2", "legacy-v3"}:
+            raise MigrationRequiredError(f"{state} store requires migration")
+        if state == "incompatible":
+            raise SchemaVersionError(
+                "database application_id/user_version is newer or foreign"
+            )
+        raise SchemaVersionError(f"store state {state!r} is not writable")
+
     @contextmanager
     def _bootstrap_writes(self) -> Iterator[None]:
         """Private bootstrap-only exception to the identity pinned guard."""
@@ -546,6 +565,7 @@ class MemoryStore:
         evidence: dict[str, Any],
         idempotency_key: str,
     ) -> dict[str, Any]:
+        self.require_writable()
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
@@ -635,6 +655,7 @@ class MemoryStore:
         surface: str = "",
         model_family: str = "",
     ) -> dict[str, Any]:
+        self.require_writable()
         self._guard_pinned(record_id)
         if operation_type not in {"correct", "refine", "supersede"}:
             raise ValueError("unsupported semantic operation")
@@ -759,6 +780,7 @@ class MemoryStore:
         idempotency_key: str,
         surface: str = "",
     ) -> dict[str, Any]:
+        self.require_writable()
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
@@ -969,6 +991,7 @@ class MemoryStore:
         cue_type: str = "phrase",
         scope: str = "global",
     ) -> None:
+        self.require_writable()
         self.initialize()
         with self.connect() as conn:
             conn.execute(
@@ -1011,6 +1034,7 @@ class MemoryStore:
         through :meth:`relation_history`.
         """
 
+        self.require_writable()
         return self._append_relation_event(
             event_type="assert",
             relation_id=relation_id,
@@ -1040,6 +1064,7 @@ class MemoryStore:
     ) -> dict[str, Any]:
         """Retract an active relation by appending a ``retract`` event."""
 
+        self.require_writable()
         if not str(actor).strip() or not str(reason).strip():
             raise ValueError("relation retraction requires actor and reason")
         return self._append_relation_event(
@@ -1250,6 +1275,7 @@ class MemoryStore:
         surface: str,
         gain: float = 0.01,
     ) -> None:
+        self.require_writable()
         gain = float(gain)
         if not 0.0 <= gain <= 1.0:
             raise ValueError("access gain must be between 0 and 1")
@@ -1295,6 +1321,7 @@ class MemoryStore:
         surface: str = "",
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        self.require_writable()
         if not run_id.strip():
             raise ValueError("maintenance run_id is required")
         if not reason.strip():
@@ -1350,6 +1377,10 @@ class MemoryStore:
                         "new_value": new_value,
                     }
                 )
+            # Test-only fault seam used by the cross-runtime oracle corpus.
+            hook = getattr(self, "_test_before_maintenance_hash_check", None)
+            if hook is not None:
+                hook(conn)
             for revision_id, expected_hash in semantic_hashes.items():
                 row = conn.execute(
                     "SELECT content_sha256 FROM memory_revisions_v3 "

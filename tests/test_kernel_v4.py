@@ -47,6 +47,7 @@ def create(intake: ValidatedIntake, record_id: str, title: str, summary: str) ->
 @pytest.fixture
 def seeded(tmp_path):
     store = MemoryStore(tmp_path / "memory.sqlite3")
+    store.initialize()
     intake = ValidatedIntake(store, surface="test")
     create(intake, "tail", "Đuôi nằm ở field", "Context carries the tail.")
     create(intake, "outro", "Stacked outro", "The song ended on vanishing.")

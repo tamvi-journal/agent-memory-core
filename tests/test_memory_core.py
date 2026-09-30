@@ -35,6 +35,7 @@ def evidence(label: str, confidence: float = 0.9) -> dict:
 
 def writer(tmp_path):
     store = MemoryStore(tmp_path / "memory.sqlite3")
+    store.initialize()
     return store, ValidatedIntake(store, surface="test")
 
 
@@ -270,6 +271,7 @@ def test_consumer_neutral_runtime_wires_profile_without_owning_identity(tmp_path
         profile,
         surface="consumer-test",
     )
+    runtime.store.initialize()
     created = runtime.submit(
         operation_type="create",
         record_id="project-choice",

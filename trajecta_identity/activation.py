@@ -53,6 +53,7 @@ def apply_recall(store: MemoryStore, hits, policy: ActivationPolicy, *, pinned: 
     evidence that it is truer (ego guard).
     """
 
+    store.require_writable()
     pinned = set(pinned)
     adjustments = []
     for hit in hits:
@@ -110,6 +111,7 @@ def run_decay(
     each run only applies the time elapsed since the previous one.
     """
 
+    store.require_writable()
     pinned = set(pinned)
     moment = _parse(now) or datetime.now(timezone.utc)
     state_file = _state_path(store)
