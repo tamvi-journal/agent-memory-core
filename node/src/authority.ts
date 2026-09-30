@@ -120,6 +120,7 @@ export class AuthorityV2 {
   }
 
   propose(input: ProposalInput): Record<string, unknown> {
+    this.store.requireWritable();
     if (!input.reason.trim()) throw new Error("a core proposal needs a reason");
     if (!input.phaseContext.entries.length) throw new Error("a core proposal needs phase_context (model, harness, policies)");
     return this.store.transaction((database) => {
@@ -185,6 +186,7 @@ export class AuthorityV2 {
   }
 
   issueCore(proposalId: string, outcome: "apply" | "reject", decisionNote: string, terminal: Terminal): Record<string, unknown> {
+    this.store.requireWritable();
     const proposal = this.store.all("SELECT * FROM memory_core_proposals_v5 WHERE proposal_id=? AND profile=?", proposalId, this.profile.name)[0];
     if (!proposal) throw new ProposalIntegrityError("proposal not found");
     if (this.store.all("SELECT 1 AS found FROM memory_proposal_decisions_v5 WHERE proposal_id=?", proposalId).length) throw new ProposalDecided("proposal is already decided");
@@ -201,6 +203,7 @@ export class AuthorityV2 {
   }
 
   issueRetract(recordId: string, reason: string, terminal: Terminal): Record<string, unknown> {
+    this.store.requireWritable();
     if ((PINNED as readonly string[]).includes(recordId)) throw new Error("core, ontology and anchors cannot be retracted");
     const current = this.store.currentView(recordId)[0];
     if (!current) throw new Error("current record not found");
@@ -212,6 +215,7 @@ export class AuthorityV2 {
   }
 
   issueLegacyClose(note: string, terminal: Terminal): Record<string, unknown> {
+    this.store.requireWritable();
     const current = this.store.currentView("core")[0];
     const relation = this.store.all("SELECT * FROM memory_relation_events_v4 WHERE from_record_id='core' AND to_record_id='anchor:discussions' AND relation_type='awaiting-discussion' ORDER BY sequence_number DESC LIMIT 1")[0];
     if (!current || !relation || relation.event_type !== "assert") throw new Error("no active legacy core discussion");
@@ -311,6 +315,7 @@ export class AuthorityV2 {
   }
 
   applyCore(receiptId: string): Record<string, unknown> {
+    this.store.requireWritable();
     return this.store.transaction((database) => {
       const { row: receipt, binding } = this.#receipt(database, receiptId, "identity_core_revision");
       const replay = this.#replay(database, receiptId); if (replay) return replay;
@@ -364,6 +369,7 @@ export class AuthorityV2 {
   }
 
   applyRetract(receiptId: string): Record<string, unknown> {
+    this.store.requireWritable();
     return this.store.transaction((database) => {
       const { row: receipt, binding } = this.#receipt(database, receiptId, "identity_retract");
       const replay = this.#replay(database, receiptId); if (replay) return replay;
@@ -386,6 +392,7 @@ export class AuthorityV2 {
   }
 
   applyLegacyClose(receiptId: string): Record<string, unknown> {
+    this.store.requireWritable();
     return this.store.transaction((database) => {
       const { row: receipt, binding } = this.#receipt(database, receiptId, "identity_legacy_discussion_close");
       const replay = this.#replay(database, receiptId); if (replay) return replay;

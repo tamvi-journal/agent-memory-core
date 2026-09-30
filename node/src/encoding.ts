@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseLossless, asString, get, objectEntries, asArray, asNumber } from "./json.ts";
 
 export type PyInt = { kind: "int"; value: bigint; text?: string };
 export type PyFloat = { kind: "float"; value: number; text?: string };
@@ -133,6 +134,26 @@ export function canonicalJson(value: JsonValue, sortKeys = true): string {
   return `{${entries.map(([key, item]) => `${quote(key)}:${canonicalJson(item, sortKeys)}`).join(",")}}`;
 }
 
+/** Python json.dumps with its default separators and optional key sorting. */
+export function pyJsonDumps(value: JsonValue, sortKeys = false): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string" ||
+      (!Array.isArray(value) && value.kind !== "object")) return canonicalJson(value);
+  if (Array.isArray(value)) return `[${value.map((item) => pyJsonDumps(item, sortKeys)).join(", ")}]`;
+  const entries = sortKeys ? [...value.entries].sort(([a], [b]) => compareCodePoint(a, b)) : value.entries;
+  return `{${entries.map(([key, item]) => `${canonicalJson(key)}: ${pyJsonDumps(item, sortKeys)}`).join(", ")}}`;
+}
+
+/** Convert product inputs to lossless JSON; plain JS numbers are always floats. */
+export function toJsonValue(value: unknown): JsonValue {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
+  if (typeof value === "number") return pyFloat(value);
+  if (typeof value === "bigint") return pyInt(value);
+  if (Array.isArray(value)) return value.map(toJsonValue);
+  if (typeof value === "object" && value && "kind" in value && ["int", "float", "object"].includes(String((value as {kind?: unknown}).kind))) return value as JsonValue;
+  if (typeof value === "object" && value) return orderedObject(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, toJsonValue(item)]));
+  throw new TypeError("value is not JSON-compatible");
+}
+
 export function hashPayload(value: JsonValue): string {
   return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
 }
@@ -180,11 +201,11 @@ function loadTitleTable() {
   const raw = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "tables", TITLE_TABLE));
   const actual = createHash("sha256").update(raw).digest("hex");
   if (actual !== TITLE_SHA256) throw new Error(`title table ${TITLE_TABLE} sha256 mismatch: ${actual}`);
-  const payload = JSON.parse(raw.toString("utf8"));
-  if (payload.schema !== "trajecta.py-title-table/v1" || payload.unicode !== "14.0.0") {
-    throw new Error(`title table ${TITLE_TABLE} has invalid metadata`);
-  }
-  titleTable = { cased: payload.cased, title: payload.title, lower: payload.lower };
+  const payload = parseLossless(raw.toString("utf8")); objectEntries(payload);
+  if (asString(get(payload, "schema")) !== "trajecta.py-title-table/v1" || asString(get(payload, "unicode")) !== "14.0.0") throw new Error(`title table ${TITLE_TABLE} has invalid metadata`);
+  const stringMap=(value: JsonValue|undefined)=>Object.fromEntries(objectEntries(value!).map(([key,item])=>[key,asString(item)]));
+  const cased=asArray(get(payload,"cased")).map(pair=>{const items=asArray(pair);return[asNumber(items[0]),asNumber(items[1])] as [number,number];});
+  titleTable = { cased, title: stringMap(get(payload,"title")), lower: stringMap(get(payload,"lower")) };
   return titleTable;
 }
 

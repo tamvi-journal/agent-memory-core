@@ -7,4 +7,13 @@
 export const hooks: {
   beforeOpen: ((path: string) => void) | null;
   afterAuthorityRevisionInsert: (() => void) | null;
-} = { beforeOpen: null, afterAuthorityRevisionInsert: null };
+  afterCreateRevisionInsert: (() => void) | null;
+  afterFirstMaintenanceAdjustment: (() => void) | null;
+  afterFirstAccessCommit: (() => void) | null;
+  afterIdentitySubmitCommit: (() => void) | null;
+  beforeMaintenanceHashCheck: ((database: any) => void) | null;
+} = {
+  beforeOpen: null, afterAuthorityRevisionInsert: null,
+  afterCreateRevisionInsert: null, afterFirstMaintenanceAdjustment: null,
+  afterFirstAccessCommit: null, afterIdentitySubmitCommit: null, beforeMaintenanceHashCheck: null,
+};

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseLossless } from "./json.ts";
+import { asString, get, objectEntries } from "./json.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TABLES = resolve(HERE, "..", "tables");
@@ -19,12 +21,12 @@ function loadTable(name: string): Record<string, string> {
   const raw = readFileSync(resolve(TABLES, file));
   const actual = createHash("sha256").update(raw).digest("hex");
   if (actual !== expected) throw new Error(`normalizer table ${file} sha256 mismatch: ${actual}`);
-  const payload = JSON.parse(raw.toString("utf8"));
-  if (payload.schema !== "trajecta.norm-table/v1" || payload.name !== name || payload.unicode !== "14.0.0") {
-    throw new Error(`normalizer table ${file} has invalid metadata`);
-  }
-  tables.set(name, payload.map);
-  return payload.map;
+  const payload = parseLossless(raw.toString("utf8"));
+  objectEntries(payload);
+  if (asString(get(payload, "schema")) !== "trajecta.norm-table/v1" || asString(get(payload, "name")) !== name || asString(get(payload, "unicode")) !== "14.0.0") throw new Error(`normalizer table ${file} has invalid metadata`);
+  const map = Object.fromEntries(objectEntries(get(payload, "map")!).map(([key,value]) => [key, asString(value)]));
+  tables.set(name, map);
+  return map;
 }
 
 function normalize(value: string, name: string): string {

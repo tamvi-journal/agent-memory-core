@@ -32,3 +32,11 @@ export class ConfirmationMismatch extends AuthorityError {}
 export class PinnedRecordError extends Error {
   constructor(message: string) { super(message); this.name = "PinnedRecordError"; }
 }
+
+export class ValueError extends Error {
+  constructor(message: string) { super(message); this.name = "ValueError"; }
+}
+
+export class RuntimeError extends Error {
+  constructor(message: string) { super(message); this.name = "RuntimeError"; }
+}
