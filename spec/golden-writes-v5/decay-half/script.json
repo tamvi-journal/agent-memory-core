@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot"},{"call":"log_phase","arguments":{"event_id":"half","title":"Half","summary":"round6 halfway"}},{"call":"decay","arguments":{"now":"2026-11-28T22:43:14+00:00"}}]}

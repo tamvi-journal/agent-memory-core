@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot"},{"call":"log_phase","arguments":{"event_id":"boundary","title":"Boundary","summary":"threshold margin"}},{"call":"decay","arguments":{"now":"2026-09-30T00:00:35+00:00"}}]}

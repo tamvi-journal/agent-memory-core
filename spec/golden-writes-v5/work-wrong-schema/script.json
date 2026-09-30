@@ -1,0 +1,1 @@
+{"work_fixture":"wrong-schema","actions":[{"call":"bootstrap","save":"boot"},{"call":"log_phase","arguments":{"event_id":"bad-work","title":"Bad","summary":"bad","work_refs":["work:12345678-abcd"]},"expect_error":"WorkStoreError"}]}

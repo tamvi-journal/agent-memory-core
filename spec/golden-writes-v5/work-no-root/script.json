@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot"},{"call":"log_phase","arguments":{"event_id":"plain-work","title":"Plain","summary":"text only","work_refs":["work:12345678-abcd"]}}]}
