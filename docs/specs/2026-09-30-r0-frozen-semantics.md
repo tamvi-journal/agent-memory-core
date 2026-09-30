@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 **Settlement it implements:** Lam, "Runtime settlement for Trajecta product" (2026-09-30): one production runtime, Node 22 / TypeScript, for Work and Identity. The port is a semantic port: freeze semantics first, port after. Sequence R0 → R1 → R2 → R3 → R4.
-**Status:** draft for Lam's review. Questions Q1–Q6 are at the end.
+**Status:** settled by Lam (Q1–Q6, F1–F3, 2026-09-30). The settlement is recorded at the end; the sections below follow it.
 **Oracle:** this repo at `def576d` (`memory_core` + `trajecta_identity`, 86 tests).
 
 ## 0. What R0 freezes, and how parity is judged
@@ -40,7 +40,10 @@ These were probed on Python 3.11.15 / Unicode 14.0.0 and Node 22. Each one is a 
   - `EVIDENCE_IDENTITY_VERSION = "evidence-v2"`.
 - **Connection pragmas.**
   - `foreign_keys=ON` on every connection.
-  - The journal mode stays at the default (`DELETE`). The port must not switch to WAL, because WAL is persisted in the file header and changes the on-disk file set.
+  - **Journal mode is asserted, not assumed (F2).** The declared mode is `DELETE`. A persisted mode can differ in an existing file (WAL is stored in the header), so:
+    - on a writable open, the runtime reads `PRAGMA journal_mode`; if it is not `delete`, it sets `PRAGMA journal_mode=DELETE` deliberately and verifies the result, failing closed if SQLite refuses;
+    - on a read-only open, a persisted `wal` mode, or a `-wal`/`-shm` sidecar next to the file, fails closed with a typed error (`IncompatibleJournalMode`) that names the explicit repair command. Read paths never convert;
+    - the oracle gets the same check, shipped with P3's PR as a fail-closed guard that changes no stored data.
   - Busy timeout is 5000 ms, matching Python's `sqlite3.connect` default.
 - **Opening rules** (same as the oracle):
   - A read never creates, initializes or migrates a store. A missing file reads as empty.
@@ -52,7 +55,8 @@ These were probed on Python 3.11.15 / Unicode 14.0.0 and Node 22. Each one is a 
   - Read-only connections use `mode=ro` URIs.
 - **Transactions.**
   - Every mutation runs in one transaction.
-  - Python uses a deferred `BEGIN` through `with conn:`. TS uses `BEGIN IMMEDIATE`, which gives the same on-disk result and fails earlier under contention (Q4).
+  - Python uses a deferred `BEGIN` through `with conn:`. TS uses `BEGIN IMMEDIATE` (Q4).
+  - The contract is atomicity, no partial write, no lost update, and fail-closed. Lock-acquisition timing is implementation behaviour, not semantic parity: TS may fail earlier under contention. Write conformance compares committed and rejected outcomes under controlled fixtures, never wait durations.
   - Retrieval with tracking is **not** one transaction: each access row is its own write. This is frozen as is.
 - **Immutability is enforced by triggers**, not by the runtime:
   - records, revisions, evidence and revision-evidence links: no update, no delete;
@@ -141,7 +145,13 @@ MCP arguments and profile files reach hashes and stored content (the governance 
 1. keeps object key order as written, including integer-like keys;
 2. keeps the number kind: a token with `.`, `e` or `E` is a float, otherwise an int.
 
-`JSON.parse` must not be used on any value that reaches a hash or stored content.
+The parser returns an **ordered-entry AST**: objects are arrays of `[key, value]` entries, and numbers carry their lexical kind and text. It never materializes a plain JS object, because a JS `Record` enumerates integer-like keys first and cannot keep insertion order.
+
+**Where it runs (F1).** Order and number kind are lost the moment `JSON.parse` runs, and they cannot be recovered afterwards. So:
+
+- The TS MCP transport reads each raw JSON-RPC line and parses it with the lossless parser **before** any ordinary object is built. Tool arguments that reach a hash or stored content are passed on as AST values. If a standard MCP SDK would run `JSON.parse` on the line first, it is not used for these tools, because parity is impossible behind it.
+- Profile files (`profile.json`, including the core seed and `phase_context`), and any other JSON whose key order or number kind reaches a hash or stored content, are read with the same parser.
+- `JSON.parse` is allowed only for values proven not to reach a hash or stored content (for example `limit`, `budget`, `include_history`).
 
 Other encodings:
 
@@ -212,6 +222,7 @@ So the whole function is `concat(M(c) for c in v)` for a per-code-point map `M`,
   - `c → "a b"` for a code point whose mapping contains an internal separator, for example `¼ → "1 4"`.
 - Every code point not in the table is a separator.
 - Surrogates are excluded, because lone surrogates are rejected at input.
+- **Table format and integrity.** Each table file is `{"schema": "trajecta.norm-table/v1", "name": "text-norm/v2" | "identity-v1", "unicode": "14.0.0", "generator": {...}, "map": {"<hex code point>": "<output>"}}`. Its sha256 is recorded in `spec/golden/MANIFEST.json` and pinned as a constant in both runtimes. Each runtime verifies the digest when it loads the table and refuses to start on a mismatch.
 - **Both runtimes use the table.** Oracle patch P3 makes the Python functions table-driven, so Python 3.10 / 3.13 CI stops drifting (H9).
 - A code point whose mapping differs between Unicode 13, 14, 15.1 and 17 is listed in `spec/tables/version-sensitive.json` for review. The frozen table wins.
 - The version string stays `text-norm/v2`, and stored `cue_norm` values are unchanged:
@@ -383,9 +394,9 @@ These are frozen from the oracle. R2 ports them exactly; the gaps in §7.6 are f
 
 - **Phase:** `phase:{id}`. Create only; a repeat returns `exists`. Links are checked to exist. Work refs are checked against the linked TWM store, which is read-only. Cues include the title.
 - **Fact:** `fact:{id}`. Unchanged (title, summary, content) → `no_op`, with links still applied. Otherwise `create`/`refine`, and the history is kept.
-- **Core:** `revise_core` requires a reason and a non-empty `phase_context`, and the merged core must pass `validate_core`. On `materialized`, it adds the relation `core → anchor:discussions` of type `awaiting-discussion`, with `source_revision_id` set to the new revision.
-- `close_discussion` and `close_loop` retract a relation.
-- `retract` invalidates a record. Pinned ids are refused.
+- **Core (legacy v0.1, frozen only for the read oracle):** `revise_core` requires a reason and a non-empty `phase_context`, and the merged core must pass `validate_core`. On `materialized`, it adds the relation `core → anchor:discussions` of type `awaiting-discussion`, with `source_revision_id` set to the new revision. **This writer is not ported.** R2 replaces it with authority-v2 (§7.5) in both runtimes.
+- `close_discussion` and `close_loop` retract a relation. In authority-v2, free-form `close_discussion` no longer settles a core proposal; see §7.5.
+- `retract` invalidates a record. Pinned ids are refused. In authority-v2 it is gated by an owner receipt.
 
 ### 7.4 Activation and decay
 
@@ -401,26 +412,39 @@ These are frozen from the oracle. R2 ports them exactly; the gaps in §7.6 are f
 
 **Ego guard.** Recall never touches stability.
 
-### 7.5 Authority law for R2 (Lam's risk A)
+### 7.5 Authority-v2 (settled Q3; introduced at the start of R2 in both runtimes)
 
-This is proposed. It needs Lam's answer to Q3.
+This intentionally changes SPEC §1. **Self-authored** means the agent authors the proposed self-location. **Authority** means who may change the canonical core revision. The agent never needs permission to write a proposal; a proposal never becomes the canonical core before an owner receipt.
 
-- **A1 — Append-only history.** Revisions, evidence, lifecycle events and relation events are append-only. Triggers enforce this, and R2 negative tests prove that each trigger fires from TS.
-- **A2 — The core stays self-authored.** The agent may revise its own core. That is the identity law, and Ty's design. The owner's check is the open discussion, which shows in every packet. The gate is on **closing** the discussion.
-- **A3 — Typed owner receipts, CLI only, as in TWM.** The actions that need an owner receipt:
-  - `identity_discussion_close` binds `{profile, core revision_id, discussion relation event id, note sha256}`.
-  - `identity_retract` binds `{profile, record_id, current revision_id, reason sha256}`.
+- **A1 — Append-only history.** Revisions, evidence, lifecycle events, relation events, proposals and receipts are append-only. Triggers enforce this, and negative tests prove that each trigger fires from TS.
+- **A2 — `identity_core_propose` (agent, MCP).** It appends a core proposal and opens its discussion. The proposal binds:
+  - `baseCoreRevisionId`, the current core revision;
+  - `contentDigest`, the sha256 of the would-be `core_content`;
+  - `phaseContextDigest` and `reasonDigest`;
+  - `proposalId` and `proposalDigest`, the digest of the whole proposal.
 
-  Today `close_discussion` fabricates `actor = "{agent}+{owner}"` from the MCP, and `retract(actor="owner")` trusts its caller. After A3:
-  - the MCP can only *request* a close;
-  - the owner CLI issues the receipt;
-  - no MCP tool issues receipts.
-- **A4 — No silent promotion.** Only these write paths exist:
-  - `core` and `vho-open-ontology-core` are written only by bootstrap (`skip_if_exists`) and `revise_core`;
-  - the anchors are written only by bootstrap.
+  The current core does not change. Open proposals surface in every packet, as `open_discussions` does today, until they are decided.
+- **A3 — Owner decision (CLI only).** The owner CLI issues a typed receipt, purpose `identity_core_revision`. It binds at least `{profile, currentCoreRevisionId, proposalId, proposalDigest, contentDigest, phaseContextDigest, reasonDigest, outcome, authority: "owner"}`, where `outcome` is `apply` or `reject`.
+  - No MCP tool issues receipts.
+  - The fabricated actor string `"{agent}+{owner}"` is removed.
+- **A4 — `identity_core_apply` consumes the exact receipt**, in **one** SQLite transaction:
+  1. re-check that the current core revision equals the receipt's `currentCoreRevisionId`, and that the proposal is still open;
+  2. for `apply`, materialize the new core revision from the proposal's content;
+  3. settle that exact proposal and its discussion as applied or rejected.
 
-  No generic submit reaches a pinned id. Negative tests cover a fact id or phase id equal to a pinned id, and a raw submit to `core`.
-- **A5 — A retry is not new power.** A receipt is bound to the current revision and the relation event it closes. After any core revision, an older close receipt is dead. The same applies to a replayed MCP call with an old note.
+  A `reject` receipt settles the proposal with no core mutation. Free-form `close_discussion` is not overloaded for either outcome.
+- **A5 — `identity_retract`** is gated by an owner receipt, purpose `identity_retract`, bound to `{profile, recordId, currentRevisionId, reasonDigest}`.
+- **A6 — No silent promotion.**
+  - `core` and `vho-open-ontology-core` are written only by bootstrap (`skip_if_exists`) and by `identity_core_apply`.
+  - Anchors are written only by bootstrap.
+  - No generic submit reaches a pinned id.
+
+  Negative tests cover a fact id or phase id equal to a pinned id, and a raw submit to `core`.
+- **A7 — A retry is not new authority.**
+  - A receipt dies when the current core revision or the proposal's state changes.
+  - Replaying the same operation with the same receipt is idempotent: it returns the prior result and grants nothing new.
+  - A receipt of one purpose never authorizes another.
+- **Fixtures.** Authority-v2 gets its own write scenarios and corpus in `spec/golden-authority-v2/`. They are generated by the Python writer once it has authority-v2, and the TS writer is compared against them. The legacy read corpus (§9) is not regenerated for this.
 
 ### 7.6 Known gaps: frozen now, fixed after parity (in both runtimes)
 
@@ -428,19 +452,21 @@ This is proposed. It needs Lam's answer to Q3.
 |---|---|---|
 | G1 | Store idempotency replay does not compare the input | compare `proposal_sha256`; refuse altered replay (TWM rule) |
 | G2 | Intake submit is not atomic across connections | one transaction, with the key check inside `BEGIN IMMEDIATE` |
-| G3 | `protected_authorized` is a boolean | typed receipt (A3 family) |
+| G3 | `protected_authorized` is a boolean | typed receipt (authority-v2 family) |
 | G4 | Cues are mutable (upsert) | cue events, or keep and document |
 | G5 | Retract key is clock-bound | key on (record, revision, reason sha) |
 | G6 | `validate_store` (doctor) and `IdentityServer._ensure` initialize the store on a read path | a doctor that does not initialize; bootstrap only on write tools |
+| G8 | `revise_core` materializes the core without owner authority | authority-v2 (§7.5), at the start of R2 |
 | G7 | `node:sqlite` is experimental on Node 22 | pin the Node version in the installer; the warning is suppressed only for that module |
 
 ## 8. Oracle patches allowed in R0
 
-These are the only Python behaviour changes before parity. Each changes only non-determinism or version drift, never meaning, and each ships with a test.
+These are the only Python behaviour changes before parity. Each changes only non-determinism or version drift, never meaning, and each ships with a test. Authority-v2 is **not** part of R0b: it changes meaning, so it starts R2, in both runtimes at once.
 
 - **P1** — Graph spread iterates the frontier sorted by `record_id`, instead of set order (H1).
 - **P2** — `cue_rows` is ordered by `weight DESC, cue_id` (H10).
-- **P3** — `normalize_text` and `normalize_identity_v1` are driven by the frozen tables (H9). A test asserts that the table equals live `unicodedata` for every code point assigned in Unicode 14, on Python 3.11.
+- **P3** — `normalize_text` and `normalize_identity_v1` are driven by the frozen tables (H9), loaded with the digest check of §5. A test asserts that the table equals live `unicodedata` for every code point assigned in Unicode 14, on Python 3.11.
+- The journal-mode read guard of §1 (F2) ships with P3's PR.
 
 ## 9. Golden corpus
 
@@ -465,7 +491,14 @@ For each scenario it writes `spec/golden/<scenario>/`:
   - the identity packet JSON;
   - the status, timeline, open discussions and open loops.
 
-`spec/golden/MANIFEST.json` holds the sha256 of every file, the oracle commit, and the Python and Unicode versions. CI regenerates the corpus on Python 3.11 and fails on any diff.
+`spec/golden/MANIFEST.json` holds:
+
+- the sha256 of every file, including the two normalizer tables;
+- the oracle commit;
+- the Python version, the Unicode version and Python's `sqlite3.sqlite_version`;
+- for conformance runs, the Node version and the `node:sqlite` SQLite version.
+
+**Determinism proof (F3).** `PYTHONHASHSEED=0` is the canonical generator setting, not the proof. CI regenerates the whole corpus under seeds 0, 1 and 4294967295, and asserts that every run is byte-identical to the checked-in corpus. Any difference fails CI, because it means hidden set-order non-determinism survived P1–P3. CI also fails on any diff against the checked-in corpus on Python 3.11.
 
 ### 9.2 Scenarios (minimum)
 
@@ -505,6 +538,10 @@ For each scenario it writes `spec/golden/<scenario>/`:
 - Retract.
 - Recall adjustments: direct, graph, wake and cap.
 - Decay at 0, 7, 21 and 400 days with different stability values.
+- Decay boundary fixtures (Q6):
+  - accessibility landing just above and just below 0.15 and 0.35;
+  - values at and around the 0.9 cap;
+  - a maintenance change of exactly 1e-6, and on each side of it.
 
 **Encoding**
 
@@ -528,13 +565,14 @@ The TS conformance tests read each scenario:
 
 ### 9.4 Tolerances
 
-Only the decay `new_value` may differ, by at most 1e-6 (H11). Everything else is compared exactly:
+Only the decay `new_value` may differ, by at most 1e-6 (H11). This is a numeric telemetry tolerance only. Everything else is compared exactly:
 
 - scores as float64 bits;
 - strings byte for byte;
-- orders exactly.
+- orders exactly;
+- every discrete outcome that depends on decay: whether a maintenance event is emitted, the active/fading/dormant classification, wake or no-wake, and recall membership and order.
 
-A decay tolerance hit is reported in the output, never hidden.
+If a 1e-6 drift changes any discrete outcome, conformance fails, and the decision to pin a deterministic `pow` is revisited. A decay tolerance hit is reported in the output, never hidden.
 
 ## 10. Phases and the Codex hand-off
 
@@ -543,23 +581,24 @@ A decay tolerance hit is reported in the output, never hidden.
   - P1, P2, P3;
   - the table generator;
   - `tools/golden/`;
+  - the journal-mode guard (F2);
   - the checked-in corpus;
-  - CI regeneration.
+  - CI regeneration under three hash seeds (F3).
 
   Python behaviour changes only as §8 allows. All 86 tests stay green, and new tests cover P1–P3.
 - **R1 — TS read-only**, one PR, at `node/` (Q1):
   - opening rules;
   - views and queries;
   - normalizers from the tables;
-  - canonical encoders (§4);
+  - canonical encoders (§4), including the lossless ordered-entry parser for profile files (F1);
   - retrieval with `track_access=false`;
   - both packet renderers;
   - status, timeline and open items.
 
   There is no MCP server yet (G6) and no writes. Conformance runs on the three OSes.
 - **R2 — TS mutations:**
-  - every write in §7;
-  - A1–A5 in both runtimes;
+  - first, authority-v2 (§7.5) lands in the Python writer with its own fixtures, then in TS;
+  - every other write in §7. The legacy `revise_core`, free-form `close_discussion` and trusted `retract` are not ported;
   - write-script replay against `dump.json`;
   - negative tests for authority and triggers;
   - crash tests: kill mid-transaction, then reopen.
@@ -567,15 +606,18 @@ A decay tolerance hit is reported in the output, never hidden.
   - Python writes and TS reads, and TS writes and Python reads, on the Mac, Windows and Linux runners;
   - one migration rehearsal on a **copy** of a real store (Ty's choice of store, never the live root).
 - **R4 — cutover**, by Lam's definition of done:
-  - the installer bundles Node;
+  - the installer bundles Node, `@trajecta/identity` and the work engine into one product package. One product and one runtime do not require one source repo; the repos merge only if that proves useful;
   - the Python writer is retired;
   - the Python oracle stays in CI as a reader for one release.
 
-## Questions for Lam
+## Settlement (Lam, 2026-09-30)
 
-- **Q1 — Where the TS code lives.** Proposed: this repo, `node/` (package `@trajecta/identity`, zero dependencies, Node 22 `--experimental-strip-types`, like TWM). Conformance then runs oracle and port in one workflow. The repos merge into one product repo at R4 packaging.
-- **Q2 — Oracle patches P1–P3 in R0.** Is it acceptable that they change Python output (the last-bit score order, `cue_rows` ties, and the Unicode-version drift)?
-- **Q3 — Owner gate scope (A2/A3).** Proposed: revision stays self-authored; closing the discussion and retracting need a CLI receipt. Or do you want a receipt on the core revision itself? That would change SPEC §1.
-- **Q4 — `BEGIN IMMEDIATE` in TS versus deferred `BEGIN` in Python.** The on-disk result is the same; TS fails earlier under contention. Is that acceptable?
-- **Q5 — Frozen tables at Unicode 14.** Proposed: text-norm/v2 = the Python 3.11 table. Code points assigned after Unicode 14 are separators until text-norm/v3.
-- **Q6 — Decay tolerance of 1e-6 (H11)**, or do you want decay moved to a pinned `pow` implementation in both runtimes?
+- **Q1 — yes.** The TS port lives in this repo under `node/`, package `@trajecta/identity`. Merging source repos later is optional, not part of the contract.
+- **Q2 — yes, P1–P3**, with a multi-hashseed proof (F3) and digest-verified tables.
+- **Q3 — changed.** The agent writes a self-authored *proposal*; materializing it as the canonical core is owner-gated (authority-v2, §7.5). It starts R2 in both runtimes, never inside R0b.
+- **Q4 — yes, `BEGIN IMMEDIATE`.** The contract is atomicity and fail-closed behaviour, not lock timing.
+- **Q5 — yes**, frozen Unicode 14 tables. Later code points are separators until v3. Digests are verified at runtime.
+- **Q6 — yes, 1e-6** numeric tolerance for decay only. Discrete outcomes must match exactly, and boundary fixtures are required.
+- **F1** — lossless parsing at the raw JSON-RPC boundary (§4.3).
+- **F2** — the journal mode is asserted, not assumed (§1).
+- **F3** — corpus determinism is proven across hash seeds (§9.1).
