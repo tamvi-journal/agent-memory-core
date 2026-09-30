@@ -1,4 +1,4 @@
-import { codePointSlice, compareCodePoint, pyFixed, pyStrip } from "./encoding.ts";
+import { codePointSlice, compareCodePoint, pyFixed, pyStrip, pyTitle } from "./encoding.ts";
 import type { MemoryProfile } from "./profile.ts";
 import type { MemoryHit } from "./retrieval.ts";
 
@@ -53,7 +53,7 @@ export class PacketRenderer {
     for (const domain of ordered) {
       const domainHits = groups.get(domain) ?? [];
       if (!domainHits.length) continue;
-      const label = this.profile.sectionLabels[domain] ?? domain.replaceAll("_", " ").replace(/(^|\s)([a-z])/g, (_, space, char) => space + char.toUpperCase());
+      const label = this.profile.sectionLabels[domain] ?? pyTitle(domain.replaceAll("_", " "));
       lines.push(`## ${label}`, "");
       for (const hit of domainHits) lines.push(...this.hitBlock(hit, compact));
     }

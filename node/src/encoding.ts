@@ -162,3 +162,27 @@ export function pySplit(value: string): string[] {
 export function pyStrip(value: string): string {
   return value.replace(PY_EDGE_WHITESPACE, "");
 }
+
+/** Python `datetime.now(timezone.utc).isoformat(timespec="seconds")`. */
+export function utcNowSeconds(): string {
+  return new Date().toISOString().replace(/\.\d{3}Z$/u, "+00:00");
+}
+
+const CASED = /[\p{Lu}\p{Ll}\p{Lt}]/u;
+
+/**
+ * Python `str.title()`: a cased character that follows an uncased one is
+ * title-cased, every other cased character is lower-cased. Exact for the
+ * ASCII and ordinary Latin domains in use; titlecase digraphs (U+01C4..)
+ * are an accepted difference.
+ */
+export function pyTitle(value: string): string {
+  let previousCased = false;
+  let result = "";
+  for (const char of value) {
+    const cased = CASED.test(char);
+    result += cased ? (previousCased ? char.toLowerCase() : char.toUpperCase()) : char;
+    previousCased = cased;
+  }
+  return result;
+}

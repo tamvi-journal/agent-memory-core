@@ -10,14 +10,22 @@ const REPAIR = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE
 
 export type Row = Record<string, string | number | null>;
 
-type Header = { applicationId: number; userVersion: number; wal: boolean };
+type Header = { applicationId: number; userVersion: number; wal: boolean; empty: boolean };
 
-function preflight(path: string): Header {
+/**
+ * Decide from the file alone, before SQLite opens it (a read-only open of a
+ * WAL database can leave -wal/-shm sidecars behind). Mirrors the Python
+ * `_preflight(readonly=True)`: only the journal mode is refused here; the
+ * ownership and version checks belong to the caller, as in Python.
+ */
+function readHeader(path: string): Header {
   const absolute = resolve(path);
   for (const suffix of ["-wal", "-shm"]) {
     if (existsSync(absolute + suffix)) throw new IncompatibleJournalMode(`SQLite WAL sidecar present. ${REPAIR}`);
   }
   const size = statSync(absolute).size;
+  // An empty file is an empty SQLite database (application_id 0, user_version 0).
+  if (size === 0) return { applicationId: 0, userVersion: 0, wal: false, empty: true };
   if (size < 100) throw new SchemaVersionError("memory database is not initialized");
   const descriptor = openSync(absolute, "r");
   const header = Buffer.alloc(100);
@@ -31,15 +39,22 @@ function preflight(path: string): Header {
   }
   const wal = header[18] === 2 || header[19] === 2;
   if (wal) throw new IncompatibleJournalMode(`SQLite journal_mode=wal. ${REPAIR}`);
-  const userVersion = header.readUInt32BE(60);
-  const applicationId = header.readUInt32BE(68);
+  // PRAGMA user_version and application_id are signed 32-bit, as in Python.
+  return { applicationId: header.readInt32BE(68), userVersion: header.readInt32BE(60), wal, empty: false };
+}
+
+/** The read path's schema assertion (Python `_assert_schema`), from the header. */
+function preflight(path: string): Header {
+  const header = readHeader(path);
+  if (header.empty) throw new SchemaVersionError("memory database is not initialized");
+  const { applicationId, userVersion } = header;
   if (userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(applicationId)) {
     throw new SchemaVersionError("database is newer than this runtime or belongs to another application");
   }
   if (applicationId === APPLICATION_ID && userVersion === LEGACY_V3_VERSION) {
     throw new MigrationRequired("schema v3 store must be initialized or migrated to v4 before use");
   }
-  return { applicationId, userVersion, wal };
+  return header;
 }
 
 export class MemoryStore {
@@ -116,13 +131,31 @@ export class MemoryStore {
     );
   }
 
+  /**
+   * Mirrors Python `schema_info`: reports the state (ready, incompatible,
+   * legacy-v2, legacy-v3, unknown, uninitialized) instead of refusing, so
+   * `status()` can describe a store it will not read. Only a WAL header or
+   * sidecar is refused, before any open.
+   */
   schemaInfo(): { application_id: number; user_version: number; state: string } {
     if (!this.exists()) return { application_id: 0, user_version: 0, state: "uninitialized" };
-    const header = preflight(this.path);
-    if (header.applicationId === APPLICATION_ID && header.userVersion === SCHEMA_VERSION) {
-      return { application_id: header.applicationId, user_version: header.userVersion, state: "ready" };
+    const header = readHeader(this.path);
+    const { applicationId, userVersion } = header;
+    let tables = new Set<unknown>();
+    if (!header.empty) {
+      const database = new DatabaseSync(this.path, { readOnly: true, timeout: 5000 });
+      try {
+        tables = new Set((database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Row[]).map((row) => row.name));
+      } finally {
+        database.close();
+      }
     }
-    this.open();
-    throw new SchemaVersionError("memory database is not initialized");
+    let state: string;
+    if (applicationId === APPLICATION_ID && userVersion === SCHEMA_VERSION) state = "ready";
+    else if (userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(applicationId)) state = "incompatible";
+    else if (tables.has("memory_records_v2")) state = "legacy-v2";
+    else if (applicationId === APPLICATION_ID && userVersion === LEGACY_V3_VERSION) state = "legacy-v3";
+    else state = "unknown";
+    return { application_id: applicationId, user_version: userVersion, state };
   }
 }

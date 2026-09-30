@@ -1,4 +1,4 @@
-import { pyRound } from "./encoding.ts";
+import { compareCodePoint, pyRound, utcNowSeconds } from "./encoding.ts";
 import { PacketRenderer } from "./packet.ts";
 import { memoryProfile, type IdentityProfile } from "./profile.ts";
 import { CueDrivenRetriever, type MemoryHit } from "./retrieval.ts";
@@ -44,7 +44,7 @@ export class IdentityMemory {
     this.surface = options.surface ?? "local";
     const coreProfile = memoryProfile(profile);
     this.retriever = new CueDrivenRetriever(this.store, coreProfile);
-    this.renderer = new PacketRenderer(coreProfile, options.now ?? (() => new Date().toISOString()));
+    this.renderer = new PacketRenderer(coreProfile, options.now ?? utcNowSeconds);
     this.displayDatabase = options.displayDatabase ?? this.store.path;
   }
 
@@ -112,7 +112,8 @@ export class IdentityMemory {
 
   timeline(limit = 20): Record<string, unknown>[] {
     const phases = this.store.currentView().filter((row) => row.domain === "phase");
-    phases.sort((a, b) => occurred(a) < occurred(b) ? 1 : occurred(a) > occurred(b) ? -1 : 0);
+    // Python: sort(key=_occurred, reverse=True), stable, by code point.
+    phases.sort((a, b) => compareCodePoint(occurred(b), occurred(a)));
     return phases.slice(0, Math.max(1, Math.min(limit, 200))).map((row) => ({
       record_id: row.record_id, at: occurred(row), title: row.title, summary: row.summary, state: stateOf(row),
     }));

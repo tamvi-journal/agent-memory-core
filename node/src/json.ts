@@ -67,7 +67,12 @@ export function parseLossless(source: string): JsonValue {
       while (true) {
         whitespace(); const key = string(); whitespace();
         if (source[offset++] !== ":") fail("expected colon");
-        entries.push([key, value()]); whitespace();
+        // Python json: a repeated key keeps its first position and takes the last value.
+        const item = value();
+        const existing = entries.findIndex(([name]) => name === key);
+        if (existing >= 0) entries[existing] = [key, item];
+        else entries.push([key, item]);
+        whitespace();
         if (source[offset] === "}") { offset++; return orderedObject(entries); }
         if (source[offset++] !== ",") fail("expected comma");
       }

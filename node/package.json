@@ -7,7 +7,7 @@
   "engines": { "node": ">=22 <23" },
   "files": ["src", "schema.sql", "tables"],
   "scripts": {
-    "test": "node --experimental-strip-types --test test/encoding.test.ts test/conformance.test.ts",
+    "test": "node --experimental-strip-types --test test/encoding.test.ts test/conformance.test.ts test/review.test.ts",
     "test:conformance": "node --experimental-strip-types --test test/conformance.test.ts"
   }
 }
