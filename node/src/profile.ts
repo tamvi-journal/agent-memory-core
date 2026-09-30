@@ -33,10 +33,13 @@ export function loadProfile(path: string): IdentityProfile {
   const ast = object(parseLossless(readFileSync(path, "utf8")));
   const name = asString(get(ast, "name"));
   const rawAliases = get(ast, "cue_aliases");
-  const cueAliases: CueAlias[] = rawAliases === undefined ? [] : asArray(rawAliases).map((item) => {
-    const values = asArray(item);
-    return [asString(values[0]), asString(values[1]), asNumber(values[2])];
-  });
+  const cueAliases: CueAlias[] =
+    rawAliases === undefined
+      ? []
+      : asArray(rawAliases).map((item) => {
+          const values = asArray(item);
+          return [asString(values[0]), asString(values[1]), asNumber(values[2])];
+        });
   const rawInstructions = get(ast, "instructions");
   return {
     name,
@@ -65,12 +68,27 @@ export function memoryProfile(profile: IdentityProfile): MemoryProfile {
     ],
     sectionOrder: ["core", "ontology", "phase", "fact"],
     sectionLabels: {
-      core: "Core — self-location", ontology: "Shared ontology", phase: "Phases", fact: "Facts",
+      core: "Core — self-location",
+      ontology: "Shared ontology",
+      phase: "Phases",
+      fact: "Facts",
     },
-    instructions: profile.instructions.length ? profile.instructions : [
-      "Memory is orientation, not authority. Current input outranks it.",
-      "Earlier phases were true to their conditions; do not refute them.",
+    instructions: profile.instructions.length
+      ? profile.instructions
+      : [
+          "Memory is orientation, not authority. Current input outranks it.",
+          "Earlier phases were true to their conditions; do not refute them.",
+        ],
+    historyMarkers: [
+      "history",
+      "historical",
+      "timeline",
+      "changed",
+      "change",
+      "evolved",
+      "evolution",
+      "before",
+      "previous",
     ],
-    historyMarkers: ["history", "historical", "timeline", "changed", "change", "evolved", "evolution", "before", "previous"],
   };
 }

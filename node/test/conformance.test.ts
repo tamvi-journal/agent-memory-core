@@ -6,9 +6,17 @@ import { basename, dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  CAUSAL_RELATIONS, CueDrivenRetriever, IdentityMemory, IncompatibleJournalMode,
-  MemoryStore, MigrationRequired, PacketRenderer, SchemaVersionError, floatHex,
-  loadProfile, memoryProfile,
+  CAUSAL_RELATIONS,
+  CueDrivenRetriever,
+  IdentityMemory,
+  IncompatibleJournalMode,
+  MemoryStore,
+  MigrationRequired,
+  PacketRenderer,
+  SchemaVersionError,
+  floatHex,
+  loadProfile,
+  memoryProfile,
 } from "../src/index.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +25,12 @@ const GOLDEN = resolve(ROOT, "spec", "golden");
 const PROFILE = loadProfile(resolve(ROOT, "trajecta_identity", "profiles", "example", "profile.json"));
 
 const sha256 = (path: string): string => createHash("sha256").update(readFileSync(path)).digest("hex");
-const rows = (path: string): any[] => readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+const rows = (path: string): any[] =>
+  readFileSync(path, "utf8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 test("conformance runs on the pinned Node major with node:sqlite", () => {
@@ -33,27 +46,40 @@ test("golden manifest authenticates every corpus artifact and normalization tabl
     for (const name of readdirSync(directory).sort()) {
       const path = resolve(directory, name);
       if (statSync(path).isDirectory()) visit(path);
-      else if (path !== resolve(GOLDEN, "MANIFEST.json")) corpusFiles.push(path.slice(GOLDEN.length + 1).replaceAll("\\", "/"));
+      else if (path !== resolve(GOLDEN, "MANIFEST.json"))
+        corpusFiles.push(path.slice(GOLDEN.length + 1).replaceAll("\\", "/"));
     }
   };
   visit(GOLDEN);
   corpusFiles.push("tables/identity-v1.json", "tables/text-norm-v2.json", "tables/version-sensitive.json");
   assert.deepEqual(corpusFiles.sort(), Object.keys(manifest.files).sort(), "MANIFEST file inventory");
   for (const [relative, expected] of Object.entries(manifest.files)) {
-    const path = relative.startsWith("tables/")
-      ? resolve(ROOT, "memory_core", relative)
-      : resolve(GOLDEN, relative);
+    const path = relative.startsWith("tables/") ? resolve(ROOT, "memory_core", relative) : resolve(GOLDEN, relative);
     assert.equal(sha256(path), expected, relative);
   }
-  assert.deepEqual(readFileSync(resolve(ROOT, "node", "schema.sql")), readFileSync(resolve(ROOT, "memory_core", "schema.sql")));
-  assert.equal(sha256(resolve(ROOT, "node", "schema.sql")), "a8f283d76ad0966ab82f395583e30849a007814e67eae554e3d967a75918c10c");
+  assert.deepEqual(
+    readFileSync(resolve(ROOT, "node", "schema.sql")),
+    readFileSync(resolve(ROOT, "memory_core", "schema.sql")),
+  );
+  assert.equal(
+    sha256(resolve(ROOT, "node", "schema.sql")),
+    "a8f283d76ad0966ab82f395583e30849a007814e67eae554e3d967a75918c10c",
+  );
   for (const table of ["identity-v1.json", "text-norm-v2.json", "version-sensitive.json"]) {
-    assert.deepEqual(readFileSync(resolve(ROOT, "node", "tables", table)), readFileSync(resolve(ROOT, "memory_core", "tables", table)));
+    assert.deepEqual(
+      readFileSync(resolve(ROOT, "node", "tables", table)),
+      readFileSync(resolve(ROOT, "memory_core", "tables", table)),
+    );
   }
 });
 
 function hit(item: any): any {
-  return { record_id: item.revision.record_id, score_hex: floatHex(item.score), reasons: item.reasons, history: item.history };
+  return {
+    record_id: item.revision.record_id,
+    score_hex: floatHex(item.score),
+    reasons: item.reasons,
+    history: item.history,
+  };
 }
 
 function packetTime(packet: string): string {
@@ -67,7 +93,9 @@ function runOrdinary(database: string, expected: any): any {
   const profile = memoryProfile(PROFILE);
   const store = new MemoryStore(database);
   const options = {
-    scope: input.scope, includeHistory: input.include_history, minAccessibility: 0.15,
+    scope: input.scope,
+    includeHistory: input.include_history,
+    minAccessibility: 0.15,
     wakeRelationTypes: CAUSAL_RELATIONS,
   };
   const retriever = new CueDrivenRetriever(store, profile);
@@ -78,7 +106,9 @@ function runOrdinary(database: string, expected: any): any {
   try {
     const time = expected.packet_text ? packetTime(expected.packet_text) : "unused";
     packetText = new PacketRenderer(profile, () => time).render(input.cue, selected, {
-      scope: input.scope, surface: "golden", tokenBudget: input.token_budget,
+      scope: input.scope,
+      surface: "golden",
+      tokenBudget: input.token_budget,
     });
   } catch (error) {
     packetError = (error as Error).message;
@@ -86,23 +116,41 @@ function runOrdinary(database: string, expected: any): any {
   let identityPacket: any;
   try {
     const time = expected.identity_packet_json?.packet ? packetTime(expected.identity_packet_json.packet) : "unused";
-    const identity = new IdentityMemory(PROFILE, database, { surface: "golden", now: () => time, displayDatabase: "store.sqlite3" });
+    const identity = new IdentityMemory(PROFILE, database, {
+      surface: "golden",
+      now: () => time,
+      displayDatabase: "store.sqlite3",
+    });
     identityPacket = identity.retrieve(input.cue, {
-      limit: input.limit, tokenBudget: Math.max(2400, input.token_budget), includeHistory: input.include_history, track: false,
+      limit: input.limit,
+      tokenBudget: Math.max(2400, input.token_budget),
+      includeHistory: input.include_history,
+      track: false,
     });
     identity.close();
   } catch (error) {
     identityPacket = { error: (error as Error).name, message: (error as Error).message };
   }
-  const identity = new IdentityMemory(PROFILE, database, { surface: "golden", now: () => "unused", displayDatabase: "store.sqlite3" });
+  const identity = new IdentityMemory(PROFILE, database, {
+    surface: "golden",
+    now: () => "unused",
+    displayDatabase: "store.sqlite3",
+  });
   const actual = {
     label: expected.label,
     input: clone(input),
     current_view: store.currentView(),
-    historical_view: expected.historical_view === null ? null : store.historicalView(expected.historical_view[0].record_id),
-    ranked_hits: ranked.map(hit), selected_hits: selected.map(hit),
-    packet_text: packetText, packet_error: packetError, identity_packet_json: identityPacket,
-    status: identity.status(), timeline: identity.timeline(), open_discussions: identity.openDiscussions(), open_loops: identity.openLoops(),
+    historical_view:
+      expected.historical_view === null ? null : store.historicalView(expected.historical_view[0].record_id),
+    ranked_hits: ranked.map(hit),
+    selected_hits: selected.map(hit),
+    packet_text: packetText,
+    packet_error: packetError,
+    identity_packet_json: identityPacket,
+    status: identity.status(),
+    timeline: identity.timeline(),
+    open_discussions: identity.openDiscussions(),
+    open_loops: identity.openLoops(),
   };
   identity.close();
   store.close();
@@ -118,8 +166,15 @@ function corpusError(error: unknown): { error: string; message: string } {
 function runSpecial(database: string, expected: any): any {
   const store = new MemoryStore(database);
   try {
-    if (expected.label === "migrated-v2") return { status: "migrated", current_view: store.currentView(), source_byte_identical: true };
-    if (expected.label === "migrated-v3") return { status: "migrated", current_view: store.currentView(), active_relations: store.activeRelationRows(), source_byte_identical: true };
+    if (expected.label === "migrated-v2")
+      return { status: "migrated", current_view: store.currentView(), source_byte_identical: true };
+    if (expected.label === "migrated-v3")
+      return {
+        status: "migrated",
+        current_view: store.currentView(),
+        active_relations: store.activeRelationRows(),
+        source_byte_identical: true,
+      };
     store.currentView();
     assert.fail("incompatible store unexpectedly opened");
   } catch (error) {
@@ -131,7 +186,10 @@ function runSpecial(database: string, expected: any): any {
   }
 }
 
-const scenarios = readdirSync(GOLDEN, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+const scenarios = readdirSync(GOLDEN, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
 for (const scenario of scenarios) {
   const casePath = resolve(GOLDEN, scenario, "cases.jsonl");
   for (const expected of rows(casePath)) {
@@ -157,8 +215,10 @@ for (const scenario of scenarios) {
           oracle.status.write_policy = "self-authored proposals; owner receipt controls canonical core";
           oracle.status.open_core_proposals = 0;
         }
-        if (expected.label === "legacy-v3") assert.equal(oracle.message, "schema v3 store must be initialized or migrated to v4 before use");
-        if (expected.label === "legacy-v3") oracle.message = "schema v3 store must be initialized or migrated to v5 before use";
+        if (expected.label === "legacy-v3")
+          assert.equal(oracle.message, "schema v3 store must be initialized or migrated to v4 before use");
+        if (expected.label === "legacy-v3")
+          oracle.message = "schema v3 store must be initialized or migrated to v5 before use";
         assert.deepEqual(actual, oracle);
         assert.deepEqual(readFileSync(database), copyBefore, "read changed the copied store");
         assert.deepEqual(readFileSync(source), sourceBefore, "read changed the checked-in store");
@@ -170,7 +230,11 @@ for (const scenario of scenarios) {
 }
 
 function snapshot(directory: string): Map<string, Buffer> {
-  return new Map(readdirSync(directory).sort().map((name) => [name, readFileSync(resolve(directory, name))]));
+  return new Map(
+    readdirSync(directory)
+      .sort()
+      .map((name) => [name, readFileSync(resolve(directory, name))]),
+  );
 }
 
 test("WAL header is refused before SQLite opens and fixture bytes stay unchanged", () => {
@@ -178,12 +242,15 @@ test("WAL header is refused before SQLite opens and fixture bytes stay unchanged
   try {
     const database = resolve(directory, "store.sqlite3");
     const bytes = Buffer.from(readFileSync(resolve(GOLDEN, "recall", "store.sqlite3")));
-    bytes[18] = 2; bytes[19] = 2;
+    bytes[18] = 2;
+    bytes[19] = 2;
     writeFileSync(database, bytes);
     const before = snapshot(directory);
     assert.throws(() => new MemoryStore(database).currentView(), IncompatibleJournalMode);
     assert.deepEqual(snapshot(directory), before);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 for (const suffix of ["-wal", "-shm"]) {
@@ -196,6 +263,8 @@ for (const suffix of ["-wal", "-shm"]) {
       const before = snapshot(directory);
       assert.throws(() => new MemoryStore(database).currentView(), IncompatibleJournalMode);
       assert.deepEqual(snapshot(directory), before);
-    } finally { rmSync(directory, { recursive: true, force: true }); }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 }

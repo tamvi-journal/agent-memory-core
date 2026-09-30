@@ -23,8 +23,13 @@ function loadTable(name: string): Record<string, string> {
   if (actual !== expected) throw new Error(`normalizer table ${file} sha256 mismatch: ${actual}`);
   const payload = parseLossless(raw.toString("utf8"));
   objectEntries(payload);
-  if (asString(get(payload, "schema")) !== "trajecta.norm-table/v1" || asString(get(payload, "name")) !== name || asString(get(payload, "unicode")) !== "14.0.0") throw new Error(`normalizer table ${file} has invalid metadata`);
-  const map = Object.fromEntries(objectEntries(get(payload, "map")!).map(([key,value]) => [key, asString(value)]));
+  if (
+    asString(get(payload, "schema")) !== "trajecta.norm-table/v1" ||
+    asString(get(payload, "name")) !== name ||
+    asString(get(payload, "unicode")) !== "14.0.0"
+  )
+    throw new Error(`normalizer table ${file} has invalid metadata`);
+  const map = Object.fromEntries(objectEntries(get(payload, "map")!).map(([key, value]) => [key, asString(value)]));
   tables.set(name, map);
   return map;
 }
@@ -38,7 +43,10 @@ function normalize(value: string, name: string): string {
 
 export const normalizeText = (value: string): string => normalize(value, "text-norm/v2");
 export const normalizeIdentityV1 = (value: string): string => normalize(value, "identity-v1");
-export const tokens = (value: string): string[] => normalizeText(value).split(" ").filter((part) => part.length > 1);
+export const tokens = (value: string): string[] =>
+  normalizeText(value)
+    .split(" ")
+    .filter((part) => part.length > 1);
 
 loadTable("text-norm/v2");
 loadTable("identity-v1");

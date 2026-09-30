@@ -20,7 +20,10 @@ export class IncompatibleJournalMode extends SchemaVersionError {
 }
 
 export class AuthorityError extends Error {
-  constructor(message: string) { super(message); this.name = new.target.name; }
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
 }
 export class ReceiptNotFound extends AuthorityError {}
 export class ReceiptIntegrityError extends AuthorityError {}
@@ -30,13 +33,22 @@ export class StaleAuthority extends AuthorityError {}
 export class HumanPresenceRequired extends AuthorityError {}
 export class ConfirmationMismatch extends AuthorityError {}
 export class PinnedRecordError extends Error {
-  constructor(message: string) { super(message); this.name = "PinnedRecordError"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "PinnedRecordError";
+  }
 }
 
 export class ValueError extends Error {
-  constructor(message: string) { super(message); this.name = "ValueError"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "ValueError";
+  }
 }
 
 export class RuntimeError extends Error {
-  constructor(message: string) { super(message); this.name = "RuntimeError"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
 }

@@ -40,7 +40,11 @@ export class CueDrivenRetriever {
     const queryTokens = new Set(tokens(query));
     const revisions = new Map<string, Row>();
     for (const row of this.store.currentView()) {
-      if (row.authority_status !== "non_authoritative" && row.record_class !== "unclassified" && ["global", scope].includes(string(row, "scope"))) {
+      if (
+        row.authority_status !== "non_authoritative" &&
+        row.record_class !== "unclassified" &&
+        ["global", scope].includes(string(row, "scope"))
+      ) {
         revisions.set(string(row, "record_id"), row);
       }
     }
@@ -54,14 +58,28 @@ export class CueDrivenRetriever {
         if (!bootstrap.has(id) && number(revision, "accessibility") < minAccessibility) dormant.add(id);
       }
     }
-    const wake = (id: string, why: string) => { dormant.delete(id); reasons.get(id)!.push(`woke:${why}`); };
+    const wake = (id: string, why: string) => {
+      dormant.delete(id);
+      reasons.get(id)!.push(`woke:${why}`);
+    };
 
-    const cues: { cue: string; cue_norm: string; target_record_id: string; weight: number }[] = this.store.cueRows(this.profile.name, scope).map((row) => ({
-      cue: string(row, "cue"), cue_norm: normalizeText(string(row, "cue")),
-      target_record_id: string(row, "target_record_id"), weight: number(row, "weight"),
-    }));
-    cues.push(...this.profile.cueAliases.map(([cue, target, weight]) => ({ cue, cue_norm: normalizeText(cue), target_record_id: target, weight })));
-    const strongest = new Map<string, typeof cues[number]>();
+    const cues: { cue: string; cue_norm: string; target_record_id: string; weight: number }[] = this.store
+      .cueRows(this.profile.name, scope)
+      .map((row) => ({
+        cue: string(row, "cue"),
+        cue_norm: normalizeText(string(row, "cue")),
+        target_record_id: string(row, "target_record_id"),
+        weight: number(row, "weight"),
+      }));
+    cues.push(
+      ...this.profile.cueAliases.map(([cue, target, weight]) => ({
+        cue,
+        cue_norm: normalizeText(cue),
+        target_record_id: target,
+        weight,
+      })),
+    );
+    const strongest = new Map<string, (typeof cues)[number]>();
     for (const cue of cues) {
       const key = `${cue.cue_norm}\0${cue.target_record_id}`;
       const current = strongest.get(key);
@@ -86,7 +104,9 @@ export class CueDrivenRetriever {
 
     for (const [id, revision] of revisions) {
       if (dormant.has(id)) continue;
-      const memoryTokens = new Set(tokens(`${string(revision, "title")}\n${string(revision, "summary")}\n${string(revision, "content")}`));
+      const memoryTokens = new Set(
+        tokens(`${string(revision, "title")}\n${string(revision, "summary")}\n${string(revision, "content")}`),
+      );
       if (queryTokens.size && memoryTokens.size) {
         let overlapCount = 0;
         for (const token of queryTokens) if (memoryTokens.has(token)) overlapCount++;
@@ -147,16 +167,24 @@ export class CueDrivenRetriever {
     }
     const ranked: MemoryHit[] = [];
     for (const [id, score] of scores) {
-      if (score >= 0.24 && !dormant.has(id)) ranked.push({ revision: revisions.get(id)!, score, reasons: reasons.get(id)!, history: [] });
+      if (score >= 0.24 && !dormant.has(id))
+        ranked.push({ revision: revisions.get(id)!, score, reasons: reasons.get(id)!, history: [] });
     }
-    ranked.sort((a, b) => b.score - a.score || compareCodePoint(string(a.revision, "record_id"), string(b.revision, "record_id")));
-    const wantsHistory = options.includeHistory !== undefined && options.includeHistory !== null
-      ? options.includeHistory
-      : this.profile.historyMarkers.some((marker) => normalized.includes(normalizeText(marker)));
+    ranked.sort(
+      (a, b) => b.score - a.score || compareCodePoint(string(a.revision, "record_id"), string(b.revision, "record_id")),
+    );
+    const wantsHistory =
+      options.includeHistory !== undefined && options.includeHistory !== null
+        ? options.includeHistory
+        : this.profile.historyMarkers.some((marker) => normalized.includes(normalizeText(marker)));
     const selected: MemoryHit[] = [];
     let spent = 0;
     for (const hit of ranked) {
-      const estimate = Math.max(1, pySplit(string(hit.revision, "title") + string(hit.revision, "summary") + string(hit.revision, "content")).length * 2);
+      const estimate = Math.max(
+        1,
+        pySplit(string(hit.revision, "title") + string(hit.revision, "summary") + string(hit.revision, "content"))
+          .length * 2,
+      );
       if (selected.length && spent + estimate > tokenBudget) continue;
       if (selected.length >= limit) break;
       if (wantsHistory) hit.history = this.store.historicalView(string(hit.revision, "record_id"));

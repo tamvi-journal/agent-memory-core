@@ -64,7 +64,7 @@ function doubleFraction(value: number): { negative: boolean; numerator: bigint; 
   const view = new DataView(buffer);
   view.setFloat64(0, value, false);
   const bits = view.getBigUint64(0, false);
-  const negative = (bits >> 63n) === 1n;
+  const negative = bits >> 63n === 1n;
   const exponentBits = Number((bits >> 52n) & 0x7ffn);
   const fraction = bits & ((1n << 52n) - 1n);
   if (exponentBits === 0x7ff) throw new TypeError("py_fixed requires a finite number");
@@ -136,8 +136,13 @@ export function canonicalJson(value: JsonValue, sortKeys = true): string {
 
 /** Python json.dumps with its default separators and optional key sorting. */
 export function pyJsonDumps(value: JsonValue, sortKeys = false): string {
-  if (value === null || typeof value === "boolean" || typeof value === "string" ||
-      (!Array.isArray(value) && value.kind !== "object")) return canonicalJson(value);
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "string" ||
+    (!Array.isArray(value) && value.kind !== "object")
+  )
+    return canonicalJson(value);
   if (Array.isArray(value)) return `[${value.map((item) => pyJsonDumps(item, sortKeys)).join(", ")}]`;
   const entries = sortKeys ? [...value.entries].sort(([a], [b]) => compareCodePoint(a, b)) : value.entries;
   return `{${entries.map(([key, item]) => `${canonicalJson(key)}: ${pyJsonDumps(item, sortKeys)}`).join(", ")}}`;
@@ -149,8 +154,17 @@ export function toJsonValue(value: unknown): JsonValue {
   if (typeof value === "number") return pyFloat(value);
   if (typeof value === "bigint") return pyInt(value);
   if (Array.isArray(value)) return value.map(toJsonValue);
-  if (typeof value === "object" && value && "kind" in value && ["int", "float", "object"].includes(String((value as {kind?: unknown}).kind))) return value as JsonValue;
-  if (typeof value === "object" && value) return orderedObject(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, toJsonValue(item)]));
+  if (
+    typeof value === "object" &&
+    value &&
+    "kind" in value &&
+    ["int", "float", "object"].includes(String((value as { kind?: unknown }).kind))
+  )
+    return value as JsonValue;
+  if (typeof value === "object" && value)
+    return orderedObject(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, toJsonValue(item)]),
+    );
   throw new TypeError("value is not JSON-compatible");
 }
 
@@ -165,8 +179,14 @@ export function floatHex(value: number): string {
   let exponent = 0;
   let n = numerator;
   let d = denominator;
-  while (n >= d * 2n) { d *= 2n; exponent++; }
-  while (n < d) { n *= 2n; exponent--; }
+  while (n >= d * 2n) {
+    d *= 2n;
+    exponent++;
+  }
+  while (n < d) {
+    n *= 2n;
+    exponent--;
+  }
   const fraction = n - d;
   const hex = ((fraction << 52n) / d).toString(16).padStart(13, "0");
   return `${negative ? "-" : ""}0x1.${hex}p${exponent >= 0 ? "+" : ""}${exponent}`;
@@ -177,7 +197,8 @@ export function codePointSlice(value: string, end: number): string {
 }
 
 const PY_WHITESPACE = /[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u;
-const PY_EDGE_WHITESPACE = /^[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/gu;
+const PY_EDGE_WHITESPACE =
+  /^[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/gu;
 
 export function pySplit(value: string): string[] {
   return value.split(PY_WHITESPACE).filter((part) => part.length > 0);
@@ -194,18 +215,28 @@ export function utcNowSeconds(): string {
 
 const TITLE_TABLE = "py-title-u14.json";
 const TITLE_SHA256 = "1ce9996ab9e3dad9cda2cee963f66c7fe23f0c18d14420b6a3e5aa0fb6a0031a";
-let titleTable: { cased: [number, number][]; title: Record<string, string>; lower: Record<string, string> } | null = null;
+let titleTable: { cased: [number, number][]; title: Record<string, string>; lower: Record<string, string> } | null =
+  null;
 
 function loadTitleTable() {
   if (titleTable) return titleTable;
   const raw = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "tables", TITLE_TABLE));
   const actual = createHash("sha256").update(raw).digest("hex");
   if (actual !== TITLE_SHA256) throw new Error(`title table ${TITLE_TABLE} sha256 mismatch: ${actual}`);
-  const payload = parseLossless(raw.toString("utf8")); objectEntries(payload);
-  if (asString(get(payload, "schema")) !== "trajecta.py-title-table/v1" || asString(get(payload, "unicode")) !== "14.0.0") throw new Error(`title table ${TITLE_TABLE} has invalid metadata`);
-  const stringMap=(value: JsonValue|undefined)=>Object.fromEntries(objectEntries(value!).map(([key,item])=>[key,asString(item)]));
-  const cased=asArray(get(payload,"cased")).map(pair=>{const items=asArray(pair);return[asNumber(items[0]),asNumber(items[1])] as [number,number];});
-  titleTable = { cased, title: stringMap(get(payload,"title")), lower: stringMap(get(payload,"lower")) };
+  const payload = parseLossless(raw.toString("utf8"));
+  objectEntries(payload);
+  if (
+    asString(get(payload, "schema")) !== "trajecta.py-title-table/v1" ||
+    asString(get(payload, "unicode")) !== "14.0.0"
+  )
+    throw new Error(`title table ${TITLE_TABLE} has invalid metadata`);
+  const stringMap = (value: JsonValue | undefined) =>
+    Object.fromEntries(objectEntries(value!).map(([key, item]) => [key, asString(item)]));
+  const cased = asArray(get(payload, "cased")).map((pair) => {
+    const items = asArray(pair);
+    return [asNumber(items[0]), asNumber(items[1])] as [number, number];
+  });
+  titleTable = { cased, title: stringMap(get(payload, "title")), lower: stringMap(get(payload, "lower")) };
   return titleTable;
 }
 

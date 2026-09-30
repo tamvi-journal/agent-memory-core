@@ -14,7 +14,12 @@ export const hooks: {
   beforeMaintenanceHashCheck: ((database: any) => void) | null;
   beforeDecaySidecarWrite: (() => void) | null;
 } = {
-  beforeOpen: null, afterAuthorityRevisionInsert: null,
-  afterCreateRevisionInsert: null, afterFirstMaintenanceAdjustment: null,
-  afterFirstAccessCommit: null, afterIdentitySubmitCommit: null, beforeMaintenanceHashCheck: null, beforeDecaySidecarWrite: null,
+  beforeOpen: null,
+  afterAuthorityRevisionInsert: null,
+  afterCreateRevisionInsert: null,
+  afterFirstMaintenanceAdjustment: null,
+  afterFirstAccessCommit: null,
+  afterIdentitySubmitCommit: null,
+  beforeMaintenanceHashCheck: null,
+  beforeDecaySidecarWrite: null,
 };
