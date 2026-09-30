@@ -1,0 +1,1 @@
+{"label":"negative-receipt-unknown","results":[{"call":"identity_core_apply","index":1,"result":{"error":"ReceiptNotFound","message":"unknown receipt receipt:00000000000000000000000000000000","no_operation":true,"store_bytes_unchanged":true}}]}

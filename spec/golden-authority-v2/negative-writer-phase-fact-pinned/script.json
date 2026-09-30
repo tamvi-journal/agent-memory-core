@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot","record":false},{"call":"runtime_submit_pinned","arguments":{"record_id":"core","record_class":"event","domain":"phase"},"expect_error":"PinnedRecordError"},{"call":"runtime_submit_pinned","arguments":{"record_id":"core","record_class":"belief","domain":"fact"},"expect_error":"PinnedRecordError"}]}

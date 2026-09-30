@@ -1,0 +1,1 @@
+{"actions":[{"call":"install_legacy_v4","source":"spec/golden/identity-open/store.sqlite3","record":false},{"call":"migrate_v4_to_v5","record":false},{"call":"owner_close_legacy","arguments":{"note":"settled"},"save":"r"},{"call":"identity_close_legacy_discussion","arguments":{"receipt_id":{"$ref":"r.receipt_id"}}}]}

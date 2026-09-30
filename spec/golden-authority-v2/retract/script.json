@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot","record":false},{"call":"fixture_log_phase","arguments":{"event_id":"retract-me","title":"Retract me","summary":"fixture"}},{"call":"owner_approve_retract","arguments":{"record_id":"phase:retract-me","reason":"owner correction"},"save":"r"},{"call":"identity_retract","arguments":{"receipt_id":{"$ref":"r.receipt_id"}}}]}
