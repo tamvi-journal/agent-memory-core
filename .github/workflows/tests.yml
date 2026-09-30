@@ -6,6 +6,22 @@ on:
   pull_request:
 
 jobs:
+  node-readonly:
+    name: ${{ matrix.os }} / node22 / read-only conformance
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Read-only conformance
+        working-directory: node
+        run: npm test
+
   test:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
