@@ -14,6 +14,7 @@ import { insertEvidence, linkEvidence, semanticHash, type Evidence, type Numeric
 import type { MemoryStore, Row } from "./store.ts";
 import { parseLossless } from "./json.ts";
 import { ValueError } from "./errors.ts";
+import { canonicalEvidenceIdentity } from "./evidence-identity.ts";
 
 const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 const num = (v: Numeric | undefined, d = 0) =>
@@ -79,16 +80,6 @@ export type IntakeProposal = {
   idempotency_key: string;
 };
 
-function identityGroup(item: Evidence): string {
-  const source = String(item.source_ref ?? "");
-  const raw = String(item.independence_group ?? source ?? String(item.source_family ?? ""));
-  return (
-    raw
-      .toLowerCase()
-      .replace(/[^a-z0-9._/-]+/gu, "-")
-      .replace(/^-+|-+$/gu, "") || "unknown-source"
-  );
-}
 function resultRow(row: Row): Record<string, unknown> {
   const result: { [k: string]: unknown } = { ...row };
   result.evidence_ids = plain(parseLossless(String(result.evidence_ids_json ?? "[]")));
@@ -173,7 +164,10 @@ export class ValidatedIntake {
       return ["held", `evidence confidence is below ${min.toFixed(2)}`];
     if (recordClass === "axis") {
       if (!String(p.falsifier).trim()) return ["held", "axis evolution requires an explicit falsifier"];
-      if (new Set(p.evidence.map(identityGroup)).size < this.policy.axisMinIndependentSources)
+      if (
+        new Set(p.evidence.map((item: Evidence) => canonicalEvidenceIdentity(item).independence_group)).size <
+        this.policy.axisMinIndependentSources
+      )
         return ["held", "axis evolution lacks independent evidence"];
     }
     if (["correct", "refine", "supersede"].includes(p.operation_type) && current) {

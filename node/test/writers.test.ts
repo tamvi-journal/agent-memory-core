@@ -261,3 +261,54 @@ test("decay sidecar bytes match Python json.dumps (default separators, micros on
   );
   m.close();
 });
+
+test("evidence identity: the governance gate and stored evidence use one canonical identity law", async () => {
+  const {
+    canonicalEvidenceIdentity,
+    ValidatedIntake,
+    DEFAULT_POLICY,
+    MemoryStore: Store,
+  } = await import("../src/index.ts");
+  // Frozen identity-v1 maps U+00E9 to "e", and str.strip removes surrounding spaces.
+  for (const [a, b] of [
+    [{ source_ref: "café" }, { source_ref: "cafe" }],
+    [{ source_ref: " golden:tea " }, { source_ref: "golden:tea" }],
+    [{ independence_group: "Group Ä" }, { independence_group: "group-a" }],
+  ] as const)
+    assert.equal(canonicalEvidenceIdentity(a).independence_group, canonicalEvidenceIdentity(b).independence_group);
+  assert.notEqual(
+    canonicalEvidenceIdentity({ source_ref: "cafe" }).independence_group,
+    canonicalEvidenceIdentity({ source_ref: "golden:tea" }).independence_group,
+  );
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-identity-law-")),
+    store = new Store(resolve(dir, "store.sqlite3"));
+  store.initialize();
+  const evidence = (source_ref: string) => ({
+    evidence_type: "synthetic",
+    source_ref,
+    content_summary: source_ref,
+    confidence: 0.9,
+    privacy_class: "synthetic",
+  });
+  const result = new ValidatedIntake(store, { surface: "test", policy: DEFAULT_POLICY }).submit({
+    operation_type: "create",
+    record_id: "axis-accent",
+    record_class: "axis",
+    domain: "logic",
+    actor: "test",
+    reason: "identity law",
+    logic: "bounded",
+    truth_basis: "fixture",
+    falsifier: "counterexample",
+    evidence: [evidence("café"), evidence("cafe")],
+    idempotency_key: "axis-accent",
+    changes: { title: "axis", summary: "accent" },
+  } as any) as any;
+  assert.equal(result.status, "held");
+  assert.equal(result.decision_reason, "axis evolution lacks independent evidence");
+  const groups = new Set(
+    store.all("SELECT independence_group FROM memory_evidence_v3").map((r) => r.independence_group),
+  );
+  assert.deepEqual([...groups], ["cafe"]);
+  store.close();
+});

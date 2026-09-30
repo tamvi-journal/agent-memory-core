@@ -129,6 +129,14 @@ def scripts() -> dict[str, dict[str, Any]]:
             {"call": "intake_submit", "save": "normal", "arguments": {"proposal": proposal("normal", "normal")}},
             {"call": "intake_submit", "arguments": {"proposal": proposal("normal", "normal-noop", operation="refine", changes={"title": "normal", "summary": "normal"})}},
             {"call": "intake_submit", "arguments": {"proposal": proposal("normal", "normal", operation="refine", changes={"summary": "different"})}, "expect_error": "ValueError"},
+            # Evidence identity law (Lam, R2b post-merge): independence is decided on
+            # canonical_evidence_identity (frozen identity-v1 table, str.strip), the same
+            # identity the evidence rows store. Unicode- or whitespace-equivalent sources
+            # are one source; a genuinely distinct pair still materializes.
+            {"call": "intake_submit", "arguments": {"proposal": proposal("axis-accent", "axis-accent", record_class="axis", domain="logic", falsifier="counterexample", evidence=[evidence("accent-a", source_ref="caf\u00e9"), evidence("accent-b", source_ref="cafe")])}},
+            {"call": "intake_submit", "arguments": {"proposal": proposal("axis-group", "axis-group", record_class="axis", domain="logic", falsifier="counterexample", evidence=[evidence("group-a", independence_group="Group \u00c4"), evidence("group-b", independence_group="group-a")])}},
+            {"call": "intake_submit", "arguments": {"proposal": proposal("axis-space", "axis-space", record_class="axis", domain="logic", falsifier="counterexample", evidence=[evidence("space-a", source_ref=" golden:tea "), evidence("space-b", source_ref="golden:tea")])}},
+            {"call": "intake_submit", "arguments": {"proposal": proposal("axis-distinct", "axis-distinct", record_class="axis", domain="logic", falsifier="counterexample", evidence=[evidence("distinct-a", source_ref="cafe"), evidence("distinct-b", source_ref="golden:tea")])}},
         ]},
         "kernel": {"actions": [
             *base,

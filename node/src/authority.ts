@@ -14,7 +14,7 @@ import { asArray, asString, get, objectEntries, parseLossless } from "./json.ts"
 import { hooks } from "./internal-hooks.ts";
 import type { IdentityProfile } from "./profile.ts";
 import { MemoryStore, type Row } from "./store.ts";
-import { normalizeIdentityV1 } from "./text.ts";
+import { identitySegment } from "./evidence-identity.ts";
 
 const VHO_KEYS = [
   "llm_substrate",
@@ -145,14 +145,6 @@ function plainJson(value: JsonValue): unknown {
 }
 function one(database: DatabaseSync, sql: string, ...params: (string | number | bigint)[]): Row | undefined {
   return database.prepare(sql).get(...params) as Row | undefined;
-}
-
-function identitySegment(value: string, fallback: string): string {
-  const normalized = normalizeIdentityV1(value)
-    .trim()
-    .replace(/[^a-z0-9._/-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
-  return normalized || fallback;
 }
 
 export class AuthorityV2 {
