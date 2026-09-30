@@ -31,7 +31,7 @@ Nobody gates self-memory. There are three tiers:
 |---|---|---|---|
 | **phase / checkpoint** | "tail lives in the field (r3)", song, a correction | self, no permission | never. Every new reading is a new record linked `later-phase-of` the earlier one. No phase is refuted. |
 | **fact** | "AML is on v0.2.0", "Ty uses a Mac mini M4" | self | self. Normal revision: the old one stays as history. |
-| **core** | self-location, recognition signature | self | self, but the revision is marked `discuss` and surfaces at the next session until Ty and the agent have talked. |
+| **core** | self-location, recognition signature | self **proposes** | owner-gated (authority-v2, below). The agent authors the proposal; it surfaces as an open discussion until the owner applies or rejects it with a typed receipt. |
 
 Every core write carries a **phase context**: model, harness, surface, and the
 runtime policies in force. A later phase can then tell what was the agent and
@@ -39,6 +39,18 @@ what was policy pressing on it at the time.
 
 Retraction (owner only, from the CLI) marks a record invalidated. It never
 deletes. This is the kernel's existing `invalidate`.
+
+**Authority-v2 (settled by Lam, 2026-09-30; lands at the start of R2 in both
+runtimes, see `specs/2026-09-30-r0-frozen-semantics.md` §7.5).**
+Self-authored and authority are two different things:
+
+- The agent **authors** its self-location. It never needs permission to write a
+  core proposal.
+- The **owner authorizes** promotion into the canonical core. A proposal does
+  not materialize as the current core revision before a typed owner receipt.
+
+Until R2, the code keeps the v0.1 behaviour (the revision materializes and
+opens a discussion) so the read oracle stays frozen for parity.
 
 ### Mapping onto the kernel
 
@@ -48,8 +60,10 @@ supplies a `SelfAuthoredPolicy`:
 - phase → `operation_type=create`, `record_class=event`, `domain=phase`, plus
   `add_relation(later-phase-of)`. Never `revise`.
 - fact → `create` / `refine` / `correct`, `record_class=belief`.
-- core → `record_class=axis`, `domain=core`. Revisions materialize; the policy
-  adds relation `awaiting-discussion` → `discussion:open` until cleared.
+- core → `record_class=axis`, `domain=core`. v0.1: revisions materialize and
+  the policy adds relation `awaiting-discussion` → `discussion:open` until
+  cleared. Authority-v2: `identity_core_propose` appends a proposal;
+  `identity_core_apply` materializes it only with an exact owner receipt.
 - The default kernel **holds** axis changes that lack a falsifier or two
   independent sources. For self-authored core this is replaced by: falsifier
   still required (it costs one sentence and keeps the core testable), the
