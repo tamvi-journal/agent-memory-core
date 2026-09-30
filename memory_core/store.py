@@ -432,7 +432,12 @@ class MemoryStore:
                 }
 
         target.parent.mkdir(parents=True, exist_ok=True)
-        backup = Path(backup_path) if backup_path is not None else target.with_name(target.name + ".v4.bak")
+        source_version = before["state"].rsplit("v", 1)[1]
+        backup = (
+            Path(backup_path)
+            if backup_path is not None
+            else target.with_name(f"{target.name}.v{source_version}.bak")
+        )
         if backup.exists():
             raise FileExistsError(backup)
         shutil.copy2(self.db_path, backup)

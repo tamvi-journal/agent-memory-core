@@ -74,7 +74,7 @@ jobs:
           for seed in 0 1 4294967295; do
             output="$(mktemp -d)/golden-authority-v2"
             PYTHONHASHSEED="$seed" python tools/golden_authority/generate.py --output "$output"
-            diff -qr --exclude=MANIFEST.json spec/golden-authority-v2 "$output"
+            diff -qr spec/golden-authority-v2 "$output"
           done
 
   writes-corpus:

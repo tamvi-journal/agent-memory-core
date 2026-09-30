@@ -110,3 +110,48 @@ def legacy_runtime_submit(store: MemoryStore):
 
 def legacy_intake_submit(store: MemoryStore):
     return ValidatedIntake(store, surface="r2b-test").submit(record_id="fact:belief")
+
+
+def test_default_retrieve_on_uninitialized_store_stays_a_pure_read(tmp_path: Path) -> None:
+    """Tracking only runs on a ready store; a fresh path is read, never created."""
+    memory = IdentityMemory(load_profile("example"), tmp_path / "fresh.sqlite3", surface="test")
+    packet = memory.retrieve("hello")  # default track=True
+    assert packet["items"] == []
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("version", [3, 4])
+def test_migration_default_backup_is_named_after_the_source_version(tmp_path: Path, version: int) -> None:
+    import sys
+
+    source = tmp_path / f"source-v{version}.sqlite3"
+    if version == 4:
+        shutil.copyfile(ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3", source)
+    else:
+        sys.path.insert(0, str(ROOT / "tools" / "golden"))
+        from generate import clock_context, legacy_v3
+
+        with clock_context():
+            legacy_v3(source)
+    original = source.read_bytes()
+    target = tmp_path / "out" / "store.sqlite3"
+    dry = MemoryStore(source).migrate_to(target, dry_run=True)
+    assert dry["dry_run"] is True
+    assert not (tmp_path / "out").exists() or list((tmp_path / "out").iterdir()) == []
+    MemoryStore(source).migrate_to(target)
+    assert sorted(p.name for p in target.parent.iterdir()) == [
+        "store.sqlite3", f"store.sqlite3.v{version}.bak"
+    ]
+    assert (target.parent / f"store.sqlite3.v{version}.bak").read_bytes() == original
+    assert source.read_bytes() == original
+
+
+def test_decay_sidecar_bytes_are_pinned(tmp_path: Path) -> None:
+    """Same literal bytes as node/test/writers.test.ts (spec §6: sidecar bytes exact)."""
+    memory = IdentityMemory(load_profile("example"), tmp_path / "store.sqlite3", surface="test")
+    memory.bootstrap()
+    sidecar = tmp_path / "store.activation.json"
+    memory.decay(now="2026-10-21T00:00:00Z")
+    assert sidecar.read_text() == '{"last_decay_at": "2026-10-21T00:00:00+00:00"}'
+    memory.decay(now="2026-10-22T00:00:00.000500+00:00")
+    assert sidecar.read_text() == '{"last_decay_at": "2026-10-22T00:00:00.000500+00:00"}'

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { hooks } from "../src/internal-hooks.ts";
@@ -312,10 +312,12 @@ for (const scenario of readdirSync(GOLDEN).sort(compareCodePoint)) {
         memory.store.close();
         assert.deepEqual(existsSync(db) ? readFileSync(db) : null, before);
         assert.equal(memory.store.all("SELECT * FROM memory_operations_v3").length, ops);
+        // Only the OS path separator right after a known root is normalized;
+        // any other backslash in a message must still match the oracle.
         let message = String(error.message)
           .replaceAll(db, "store.sqlite3")
-          .replaceAll(work, "<work-root>")
-          .replaceAll("\\", "/");
+          .replaceAll(`${work}${sep}`, "<work-root>/")
+          .replaceAll(work, "<work-root>");
         results.push({
           index: i,
           call: action.call,
@@ -566,4 +568,30 @@ test("writes corpus legacy-v4", () => {
   const expected = plain(parseLossless(readFileSync(resolve(folder, "cases.jsonl"), "utf8")));
   assert.equal(canonicalPlain({ label: "legacy-v4", results }), canonicalPlain(expected));
   assert.deepEqual(readFileSync(db), readFileSync(resolve(folder, "store.sqlite3")));
+});
+
+test("migration default backup is named after the source version, and a dry run leaves only the source", () => {
+  for (const version of [2, 3, 4] as const) {
+    const temp = mkdtempSync(resolve(tmpdir(), `r2b-backup-v${version}-`)),
+      source = resolve(temp, `source-v${version}.sqlite3`),
+      out = resolve(temp, "out"),
+      target = resolve(out, "store.sqlite3"),
+      clock = new InjectedClock();
+    if (version === 2) legacyV2(source);
+    else if (version === 3) legacyV3(source, clock);
+    else cpSync(resolve(ROOT, "spec", "golden", "identity-open", "store.sqlite3"), source);
+    const original = readFileSync(source);
+    const dry = new MemoryStore(source, { now: () => clock.seconds() }).migrateTo(target, { dryRun: true }) as any;
+    assert.equal(dry.dry_run, true);
+    assert.deepEqual(
+      readdirSync(temp).sort(),
+      [`source-v${version}.sqlite3`].concat(existsSync(out) ? ["out"] : []).sort(),
+    );
+    if (existsSync(out)) assert.deepEqual(readdirSync(out), []);
+    const migrated = new MemoryStore(source, { now: () => clock.seconds() }).migrateTo(target) as MemoryStore;
+    migrated.close();
+    assert.deepEqual(readdirSync(out).sort(), ["store.sqlite3", `store.sqlite3.v${version}.bak`]);
+    assert.ok(readFileSync(resolve(out, `store.sqlite3.v${version}.bak`)).equals(original));
+    assert.ok(readFileSync(source).equals(original));
+  }
 });

@@ -442,7 +442,9 @@ export class IdentityMemory {
     const limit = options.limit ?? 10,
       tokenBudget = options.tokenBudget ?? 2400;
     let track = options.track ?? true;
-    if (this.store.schemaInfo().state === "legacy-v4") track = false;
+    // Tracking writes only on a writable store. legacy-v4 (R2a Q1) and an
+    // uninitialized store stay pure reads: recall degrades to track=false.
+    if (this.store.schemaInfo().state !== "ready") track = false;
     const hits = this.retriever.retrieve(cue, {
       limit,
       tokenBudget: Math.max(tokenBudget * 8, 20000),
@@ -576,15 +578,13 @@ export class IdentityMemory {
   timeline(limit = 20) {
     const p = this.store.currentView().filter((r) => r.domain === "phase");
     p.sort((a, b) => compareCodePoint(occurred(b), occurred(a)));
-    return p
-      .slice(0, Math.max(1, Math.min(limit, 200)))
-      .map((r) => ({
-        record_id: r.record_id,
-        at: occurred(r),
-        title: r.title,
-        summary: r.summary,
-        state: stateOf(r, this.activation, PINNED),
-      }));
+    return p.slice(0, Math.max(1, Math.min(limit, 200))).map((r) => ({
+      record_id: r.record_id,
+      at: occurred(r),
+      title: r.title,
+      summary: r.summary,
+      state: stateOf(r, this.activation, PINNED),
+    }));
   }
   status() {
     const info = this.store.schemaInfo(),

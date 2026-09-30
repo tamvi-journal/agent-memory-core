@@ -905,7 +905,7 @@ class IdentityMemory:
         # R2a Q1: a legacy-v4 store is fully readable. Tracking writes
         # (record_access, recall maintenance) only happen on a writable store;
         # on v4 recall degrades transparently to read-only.
-        track = track and self.store.schema_info()["state"] != "legacy-v4"
+        track = track and self.store.schema_info()["state"] == "ready"
         hits = self.runtime.retrieve(
             cue,
             limit=limit,

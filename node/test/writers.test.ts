@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -232,4 +232,32 @@ test("migration rejects WAL sidecars, foreign and future sources before target c
     assert.throws(() => new MemoryStore(source).migrateTo(target));
     assert.equal(existsSync(target), false);
   }
+});
+
+test("default retrieve on an uninitialized store stays a pure read", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-fresh-")),
+    memory = memoryAt(resolve(dir, "fresh.sqlite3"));
+  const packet = memory.retrieve("hello") as any; // default track=true
+  memory.close();
+  assert.deepEqual(packet.items, []);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test("decay sidecar bytes match Python json.dumps (default separators, micros only when non-zero)", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-sidecar-")),
+    db = resolve(dir, "store.sqlite3"),
+    m = memoryAt(db);
+  m.bootstrap();
+  m.decay("2026-10-21T00:00:00Z");
+  // Python: json.dumps({"last_decay_at": moment.isoformat()}) — pinned in tests/test_r2b_oracle_patches.py.
+  assert.equal(
+    readFileSync(resolve(dir, "store.activation.json"), "utf8"),
+    '{"last_decay_at": "2026-10-21T00:00:00+00:00"}',
+  );
+  m.decay("2026-10-22T00:00:00.000500+00:00");
+  assert.equal(
+    readFileSync(resolve(dir, "store.activation.json"), "utf8"),
+    '{"last_decay_at": "2026-10-22T00:00:00.000500+00:00"}',
+  );
+  m.close();
 });
