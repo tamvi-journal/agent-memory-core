@@ -42,8 +42,6 @@ function plain(value: JsonValue): any {
   return Object.fromEntries(value.entries.map(([key, item]) => [key, plain(item)]));
 }
 
-const BOOTSTRAP = plain(parseLossless(readFileSync(resolve(GOLDEN, "negative-receipt-unknown", "dump.json"), "utf8")));
-
 function astObject(value: JsonValue | undefined): OrderedObject {
   if (!value || Array.isArray(value) || typeof value !== "object" || value.kind !== "object") throw new TypeError("expected object");
   return value;
@@ -53,62 +51,10 @@ function astGet(value: OrderedObject, key: string): JsonValue | undefined {
   return value.entries.find(([name]) => name === key)?.[1];
 }
 
-function jsonValue(value: any): JsonValue {
-  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
-  if (Array.isArray(value)) return value.map(jsonValue);
-  if (typeof value === "number") return Number.isInteger(value) ? { kind: "int", value: BigInt(value) } : { kind: "float", value };
-  return orderedObject(Object.entries(value).map(([key, item]) => [key, jsonValue(item)]));
-}
-
 function canonicalPlain(value: any): string {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalPlain).join(",")}]`;
   return `{${Object.keys(value).sort(compareCodePoint).map((key) => `${JSON.stringify(key)}:${canonicalPlain(value[key])}`).join(",")}}`;
-}
-
-function databaseValue(value: any): any {
-  return value && typeof value === "object" && !Array.isArray(value) && "repr" in value && "hex" in value ? Number(value.repr) : value;
-}
-
-function insertRows(database: DatabaseSync, table: string, rows: any[]): void {
-  for (const row of rows) {
-    const columns = Object.keys(row);
-    const quoted = columns.map((name) => `"${name.replaceAll('"', '""')}"`).join(",");
-    database.prepare(`INSERT INTO "${table}"(${quoted}) VALUES(${columns.map(() => "?").join(",")})`).run(...columns.map((name) => databaseValue(row[name])));
-  }
-}
-
-const INSERT_ORDER = [
-  "memory_records_v3", "memory_revisions_v3", "memory_telemetry_v3", "memory_evidence_v3",
-  "memory_revision_evidence_v3", "memory_relations_v3", "memory_relation_events_v4", "memory_cues_v3",
-  "memory_operations_v3", "memory_lifecycle_events_v3", "memory_intake_v3", "memory_access_v3",
-  "memory_core_proposals_v5", "memory_owner_receipts_v5", "memory_proposal_decisions_v5", "memory_receipt_consumptions_v5",
-];
-
-function seedBootstrap(store: MemoryStore): void {
-  store.initialize();
-  store.transaction((database) => {
-    for (const table of INSERT_ORDER) insertRows(database, table, BOOTSTRAP.tables[table] ?? []);
-  });
-}
-
-function seedPhase(store: MemoryStore, expectedDump: any): void {
-  const tables = expectedDump.tables;
-  const revision = tables.memory_revisions_v3.find((row: any) => row.record_id === "phase:retract-me");
-  const revisionId = revision.revision_id;
-  const selfEvidence = tables.memory_evidence_v3.find((row: any) => row.source_ref === "self:retract-me");
-  const selected: Record<string, any[]> = {
-    memory_records_v3: tables.memory_records_v3.filter((row: any) => row.record_id === "phase:retract-me"),
-    memory_revisions_v3: [revision],
-    memory_telemetry_v3: tables.memory_telemetry_v3.filter((row: any) => row.revision_id === revisionId),
-    memory_evidence_v3: [selfEvidence],
-    memory_revision_evidence_v3: tables.memory_revision_evidence_v3.filter((row: any) => row.revision_id === revisionId && row.evidence_id === selfEvidence.evidence_id),
-    memory_cues_v3: tables.memory_cues_v3.filter((row: any) => row.target_record_id === "phase:retract-me"),
-    memory_intake_v3: tables.memory_intake_v3.filter((row: any) => row.target_record_id === "phase:retract-me"),
-    memory_operations_v3: tables.memory_operations_v3.filter((row: any) => row.target_record_id === "phase:retract-me" && row.operation_type === "create"),
-    memory_lifecycle_events_v3: tables.memory_lifecycle_events_v3.filter((row: any) => row.record_id === "phase:retract-me" && row.lifecycle_state === "current"),
-  };
-  store.transaction((database) => { for (const table of INSERT_ORDER) insertRows(database, table, selected[table] ?? []); });
 }
 
 function dumpDatabase(path: string): any {
@@ -215,7 +161,7 @@ for (const scenario of scenarios) {
         let result: any;
         try {
           switch (action.call) {
-            case "bootstrap": seedBootstrap(memory.store); clock.calls = 28; result = { status: "bootstrapped" }; break;
+            case "bootstrap": memory.bootstrap(); result = { status: "bootstrapped" }; break;
             case "install_legacy_v4": memory.close(); copyFileSync(resolve(ROOT, action.source), databasePath); resetMemory(); result = null; break;
             case "migrate_v4_to_v5": {
               const target = resolve(directory, "migrated.sqlite3"); const backup = resolve(directory, "legacy.backup.sqlite3");
@@ -239,10 +185,7 @@ for (const scenario of scenarios) {
               result = memory.issueCoreReceipt(args.proposal_id, args.outcome, args.decision_note ?? "", new TTY(value, args.tty ?? true)); break;
             }
             case "identity_core_apply": result = memory.coreApply(args.receipt_id); break;
-            case "fixture_log_phase": {
-              if (memory.store.schemaInfo().state === "legacy-v4") memory.store.transaction(() => null);
-              seedPhase(memory.store, expectedDump); clock.calls += 7; result = { linked: {}, record_id: "phase:retract-me", status: "logged" }; break;
-            }
+            case "fixture_log_phase": result = memory.logPhase(args.event_id, { title: args.title, summary: args.summary }); break;
             case "owner_approve_retract": result = memory.issueRetractReceipt(args.record_id, args.reason, new TTY(`RETRACT ${args.record_id}`)); break;
             case "identity_retract": result = memory.retract(args.receipt_id); break;
             case "apply_retract_wrong_purpose": result = memory.retract(args.receipt_id); break;
@@ -258,8 +201,8 @@ for (const scenario of scenarios) {
               try { result = other.coreApply(args.receipt_id); } finally { other.close(); }
               break;
             }
-            case "public_writer_pinned": result = (memory.store as any)[args.writer === "create" ? "createCurrent" : args.writer](args.record_id); break;
-            case "runtime_submit_pinned": memory.store.guardPinned(args.record_id); result = null; break;
+            case "public_writer_pinned": {const common={recordId:args.record_id,actor:"golden",reason:"pinned",evidence:{source_ref:"golden:pinned",content_summary:"pinned"},idempotencyKey:`pinned:${args.writer}`};result=args.writer==="create"?memory.store.createCurrent({...common,recordClass:"belief",domain:"fact",title:"pinned"}):args.writer==="revise"?memory.store.revise({...common,operationType:"refine",changes:{summary:"pinned"}}):memory.store.invalidate(common);break;}
+            case "runtime_submit_pinned": result=memory.runtime.submit({operation_type:"create",record_id:args.record_id,record_class:args.record_class,domain:args.domain,actor:"golden",reason:"pinned",logic:"pinned",truth_basis:"pinned",evidence:[{source_ref:"golden:pinned",content_summary:"pinned"}],idempotency_key:`pinned:${args.domain}`,changes:{title:"pinned"}}); break;
             case "raw_append_only": mutate(databasePath, (db) => db.exec(args.verb === "DELETE" ? `DELETE FROM ${args.table}` : `UPDATE ${args.table} SET rowid=rowid`)); result = null; break;
             case "tamper": mutate(databasePath, (db) => {
               const table = action.kind.startsWith("receipt-") ? "memory_owner_receipts_v5" : "memory_core_proposals_v5"; dropGuards(db, table);
