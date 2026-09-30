@@ -214,17 +214,18 @@ tokens(v) = [p for p in normalize_text(v).split(" ") if len(p) > 1]
 
 So the whole function is `concat(M(c) for c in v)` for a per-code-point map `M`, followed by the token regex. `M(c)` is a string over `[a-z0-9_]` plus a separator.
 
-**Contract:** text-norm/v2 and identity-v1 are **defined by tables generated once from the oracle** on Python 3.11 (Unicode 14.0.0). These are `spec/tables/text-norm-v2.json` and `spec/tables/identity-v1.json`.
+**Contract:** text-norm/v2 and identity-v1 are **defined by tables generated once from the oracle** on Python 3.11 (Unicode 14.0.0). These are `memory_core/tables/text-norm-v2.json` and `memory_core/tables/identity-v1.json`. They are package data next to `schema.sql`, so every install carries them, including the vendored Claude `.plugin`.
 
 - Each table stores only the code points that do not map to "separator":
   - `c → "tokenchars"`, for example `ễ → "e"` and `𝐀 → "a"`;
   - `c → ""` for a code point that is dropped and so joins its neighbours, for example U+0301;
-  - `c → "a b"` for a code point whose mapping contains an internal separator, for example `¼ → "1 4"`.
+  - `c → "a b"` for a code point whose mapping contains an internal separator, for example `¼ → "1 4"`;
+  - separators at either **end** of the mapping are kept as a space, because they split the code point from its neighbours: `⑴ → " 1 "`, so `a⑴b` normalizes to `a 1 b`, not `a1b`. In general the value is the exact per-code-point output with every run of non-token characters written as one space (found by Codex in R0b).
 - Every code point not in the table is a separator.
 - Surrogates are excluded, because lone surrogates are rejected at input.
 - **Table format and integrity.** Each table file is `{"schema": "trajecta.norm-table/v1", "name": "text-norm/v2" | "identity-v1", "unicode": "14.0.0", "generator": {...}, "map": {"<hex code point>": "<output>"}}`. Its sha256 is recorded in `spec/golden/MANIFEST.json` and pinned as a constant in both runtimes. Each runtime verifies the digest when it loads the table and refuses to start on a mismatch.
 - **Both runtimes use the table.** Oracle patch P3 makes the Python functions table-driven, so Python 3.10 / 3.13 CI stops drifting (H9).
-- A code point whose mapping differs between Unicode 13, 14, 15.1 and 17 is listed in `spec/tables/version-sensitive.json` for review. The frozen table wins.
+- A code point whose mapping differs between Unicode 13, 14, 15.1 and 17 is listed in `memory_core/tables/version-sensitive.json` for review. The frozen table wins.
 - The version string stays `text-norm/v2`, and stored `cue_norm` values are unchanged:
   - the oracle recomputes `cue_norm` from the raw cue at query time;
   - for every code point that exists in Unicode 14, the table is identical to Python 3.11.

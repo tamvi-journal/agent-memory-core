@@ -5,14 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sys
 from functools import lru_cache
 from pathlib import Path
 
 
 TEXT_NORMALIZER_VERSION = "text-norm/v2"
-_TABLES = Path(__file__).resolve().parents[1] / "spec" / "tables"
-_WHEEL_TABLES = Path(sys.prefix) / "share" / "trajecta-identity-memory" / "tables"
+# Package data next to schema.sql, so every install (wheel, --user, the
+# vendored Claude .plugin) carries the exact frozen tables.
+_TABLES = Path(__file__).resolve().with_name("tables")
 _DIGESTS = {
     "text-norm/v2": ("text-norm-v2.json", "d1b7f523d9bbd35968543ef9582837d8cd28d8bb8a1fb1771f001682618c9b69"),
     "identity-v1": ("identity-v1.json", "51dab4bc79928eef80a063130f4638864a0c97391964c81a14ad32dd999749a9"),
@@ -22,7 +22,7 @@ _DIGESTS = {
 @lru_cache(maxsize=2)
 def _table(name: str) -> dict[str, str]:
     file, expected = _DIGESTS[name]
-    path = _TABLES / file if _TABLES.exists() else _WHEEL_TABLES / file
+    path = _TABLES / file
     raw = path.read_bytes()
     actual = hashlib.sha256(raw).hexdigest()
     if actual != expected:

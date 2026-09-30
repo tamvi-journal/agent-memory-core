@@ -137,6 +137,14 @@ class MemoryStore:
                 if mode == "wal":
                     raise IncompatibleJournalMode(f"SQLite journal_mode=wal. {repair}")
             elif mode != "delete":
+                # Never rewrite the header of a database this store does not
+                # own: a foreign or future file is refused untouched.
+                application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
+                user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+                if application_id not in {0, APPLICATION_ID} or user_version > SCHEMA_VERSION:
+                    raise SchemaVersionError(
+                        "database application_id/user_version is newer or foreign"
+                    )
                 try:
                     mode = str(conn.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower()
                 except sqlite3.Error as exc:

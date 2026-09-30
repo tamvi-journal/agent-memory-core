@@ -537,18 +537,23 @@ def generate(output: Path):
             (destination / "cases.jsonl").write_text(
                 "".join(canonical(case) + "\n" for case in cases), encoding="utf-8")
 
-    files = [*output.rglob("*")]
-    files = [path for path in files if path.is_file()]
-    files += list((ROOT / "spec" / "tables").glob("*.json"))
+    corpus = sorted(path for path in output.rglob("*") if path.is_file())
+    tables = sorted((ROOT / "memory_core" / "tables").glob("*.json"))
     manifest = {
         "schema": "trajecta.golden-manifest/v1",
         "oracle_commit": ORACLE_COMMIT,
         "python": sys.version.split()[0],
         "unicode": unicodedata.unidata_version,
         "sqlite": sqlite3.sqlite_version,
-        "files": {str(path.relative_to(ROOT / "spec") if path.is_relative_to(ROOT / "spec")
-                      else path.relative_to(output).as_posix()): hashlib.sha256(path.read_bytes()).hexdigest()
-                  for path in sorted(files)},
+        # Keys never depend on where --output points or on the OS path
+        # separator: corpus files relative to the output root, tables as
+        # tables/<name>.
+        "files": dict(sorted(
+            [(path.relative_to(output).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest())
+             for path in corpus]
+            + [(f"tables/{path.name}", hashlib.sha256(path.read_bytes()).hexdigest())
+               for path in tables]
+        )),
     }
     write(output / "MANIFEST.json", manifest)
 

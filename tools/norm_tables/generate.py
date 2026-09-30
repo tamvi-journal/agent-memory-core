@@ -16,7 +16,7 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-TABLES = ROOT / "spec" / "tables"
+TABLES = ROOT / "memory_core" / "tables"
 TRANSLITERATE = str.maketrans({
     "đ": "d", "ð": "d", "ł": "l", "ø": "o", "ħ": "h", "ı": "i",
     "ŧ": "t", "æ": "ae", "œ": "oe", "þ": "th",

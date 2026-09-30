@@ -120,3 +120,25 @@ def test_readonly_rejects_sidecars(tmp_path: Path, suffix: str):
     Path(f"{path}{suffix}").touch()
     with pytest.raises(IncompatibleJournalMode, match="WAL sidecar"):
         store.current_view()
+
+
+def test_writable_open_never_rewrites_a_foreign_wal_header(tmp_path: Path):
+    path = tmp_path / "foreign.sqlite3"
+    with sqlite3.connect(path) as conn:
+        conn.execute("PRAGMA application_id=1234")
+        conn.execute("CREATE TABLE t(x)")
+        assert conn.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+    conn.close()
+    before = path.read_bytes()
+    from memory_core import SchemaVersionError
+    with pytest.raises(SchemaVersionError, match="foreign"):
+        MemoryStore(path).initialize()
+    assert path.read_bytes() == before
+
+
+def test_vendored_plugin_carries_the_frozen_tables():
+    from trajecta_identity.plugin import plugin_files
+
+    files = plugin_files("example", target="posix", env={"TRAJECTA_IDENTITY_DATA_DIR": "~/x"})
+    for name in ("text-norm-v2.json", "identity-v1.json"):
+        assert files[f"memory_core/tables/{name}"] == (frozen._TABLES / name).read_bytes()
