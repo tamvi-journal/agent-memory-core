@@ -40,6 +40,7 @@ class MemoryRuntime:
         self.renderer = PacketRenderer(profile)
 
     def submit(self, **proposal: Any) -> dict[str, Any]:
+        self.store.require_writable()
         return self.intake.submit(**proposal)
 
     def retrieve(
@@ -115,6 +116,7 @@ class MemoryRuntime:
         )
 
     def apply_maintenance(self, **maintenance: Any) -> dict[str, Any]:
+        self.store.require_writable()
         maintenance.setdefault("surface", self.surface)
         return self.store.apply_maintenance(**maintenance)
 

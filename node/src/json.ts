@@ -2,8 +2,12 @@ import { orderedObject, type JsonValue, type OrderedObject, type PyFloat, type P
 
 export function parseLossless(source: string): JsonValue {
   let offset = 0;
-  const fail = (message: string): never => { throw new SyntaxError(`${message} at ${offset}`); };
-  const whitespace = () => { while (" \t\n\r".includes(source[offset] ?? "\0")) offset++; };
+  const fail = (message: string): never => {
+    throw new SyntaxError(`${message} at ${offset}`);
+  };
+  const whitespace = () => {
+    while (" \t\n\r".includes(source[offset] ?? "\0")) offset++;
+  };
   const string = (): string => {
     if (source[offset++] !== '"') fail("expected string");
     let result = "";
@@ -26,7 +30,16 @@ export function parseLossless(source: string): JsonValue {
         continue;
       }
       const escape = source[offset++];
-      const short: Record<string, string> = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+      const short: Record<string, string> = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
       if (escape in short) result += short[escape];
       else if (escape === "u") {
         const hex = source.slice(offset, offset + 4);
@@ -53,19 +66,35 @@ export function parseLossless(source: string): JsonValue {
     const char = source[offset];
     if (char === '"') return string();
     if (char === "[") {
-      offset++; const result: JsonValue[] = []; whitespace();
-      if (source[offset] === "]") { offset++; return result; }
+      offset++;
+      const result: JsonValue[] = [];
+      whitespace();
+      if (source[offset] === "]") {
+        offset++;
+        return result;
+      }
       while (true) {
-        result.push(value()); whitespace();
-        if (source[offset] === "]") { offset++; return result; }
+        result.push(value());
+        whitespace();
+        if (source[offset] === "]") {
+          offset++;
+          return result;
+        }
         if (source[offset++] !== ",") fail("expected comma");
       }
     }
     if (char === "{") {
-      offset++; const entries: [string, JsonValue][] = []; whitespace();
-      if (source[offset] === "}") { offset++; return orderedObject(entries); }
+      offset++;
+      const entries: [string, JsonValue][] = [];
+      whitespace();
+      if (source[offset] === "}") {
+        offset++;
+        return orderedObject(entries);
+      }
       while (true) {
-        whitespace(); const key = string(); whitespace();
+        whitespace();
+        const key = string();
+        whitespace();
         if (source[offset++] !== ":") fail("expected colon");
         // Python json: a repeated key keeps its first position and takes the last value.
         const item = value();
@@ -73,16 +102,29 @@ export function parseLossless(source: string): JsonValue {
         if (existing >= 0) entries[existing] = [key, item];
         else entries.push([key, item]);
         whitespace();
-        if (source[offset] === "}") { offset++; return orderedObject(entries); }
+        if (source[offset] === "}") {
+          offset++;
+          return orderedObject(entries);
+        }
         if (source[offset++] !== ",") fail("expected comma");
       }
     }
-    if (source.startsWith("true", offset)) { offset += 4; return true; }
-    if (source.startsWith("false", offset)) { offset += 5; return false; }
-    if (source.startsWith("null", offset)) { offset += 4; return null; }
+    if (source.startsWith("true", offset)) {
+      offset += 4;
+      return true;
+    }
+    if (source.startsWith("false", offset)) {
+      offset += 5;
+      return false;
+    }
+    if (source.startsWith("null", offset)) {
+      offset += 4;
+      return null;
+    }
     return number();
   };
-  const result = value(); whitespace();
+  const result = value();
+  whitespace();
   if (offset !== source.length) fail("trailing input");
   return result;
 }
@@ -110,6 +152,7 @@ export function asArray(value: JsonValue | undefined): JsonValue[] {
 }
 
 export function asNumber(value: JsonValue | undefined): number {
-  if (!value || typeof value !== "object" || !("kind" in value) || !["int", "float"].includes(value.kind)) throw new TypeError("expected number");
+  if (!value || typeof value !== "object" || !("kind" in value) || !["int", "float"].includes(value.kind))
+    throw new TypeError("expected number");
   return value.kind === "int" ? Number(value.value) : value.value;
 }

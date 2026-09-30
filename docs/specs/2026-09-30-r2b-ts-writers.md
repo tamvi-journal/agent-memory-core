@@ -18,7 +18,7 @@ R2b gives `@trajecta/identity` every **write** in R0 §7 that R2a did not port, 
 **Out of scope**
 - R2c: the TS MCP server, raw JSON-RPC boundary parsing, connection lifecycle and revalidation, and `readOnlyHint` semantics for `identity_retrieve`.
 - R3: cross-runtime runs and the migration rehearsal on a copy of a real store.
-- The gap fixes G1–G11: frozen now, fixed after R3, in both runtimes.
+- The gap fixes G1–G12: frozen now, fixed after R3, in both runtimes.
 - `migrate_aml.py`, the AML import tool (see Q6).
 
 ## 1. Oracle and parity

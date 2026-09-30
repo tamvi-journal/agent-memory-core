@@ -1,15 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  canonicalJson, codePointSlice, hashPayload, normalizeText, orderedObject,
-  parseLossless, pyFixed, pyFloat, pyFloatRepr, pyInt, pySplit,
+  canonicalJson,
+  codePointSlice,
+  hashPayload,
+  normalizeText,
+  orderedObject,
+  parseLossless,
+  pyFixed,
+  pyFloat,
+  pyFloatRepr,
+  pyInt,
+  pySplit,
 } from "../src/index.ts";
 
 test("typed canonical JSON preserves Python int and float meanings", () => {
   assert.equal(canonicalJson(pyInt(1)), "1");
   assert.equal(canonicalJson(pyFloat(1)), "1.0");
   assert.notEqual(hashPayload(pyInt(1)), hashPayload(pyFloat(1)));
-  assert.equal(canonicalJson(orderedObject([["10", pyInt(10)], ["2", pyFloat(2)], ["é", "\u2028"]])), '{"10":10,"2":2.0,"é":"\u2028"}');
+  assert.equal(
+    canonicalJson(
+      orderedObject([
+        ["10", pyInt(10)],
+        ["2", pyFloat(2)],
+        ["é", "\u2028"],
+      ]),
+    ),
+    '{"10":10,"2":2.0,"é":"\u2028"}',
+  );
 });
 
 test("lossless parser preserves written object order and number kind", () => {

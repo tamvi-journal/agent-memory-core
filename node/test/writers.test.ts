@@ -1,0 +1,263 @@
+import assert from "node:assert/strict";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+import { IdentityMemory, InjectedClock, MemoryStore, WallClock, loadProfile, pyFixed } from "../src/index.ts";
+import { hooks } from "../src/internal-hooks.ts";
+
+const ROOT = resolve(import.meta.dirname, "..", "..");
+const PROFILE = loadProfile(resolve(ROOT, "trajecta_identity", "profiles", "example", "profile.json"));
+const child = (mode: string, db: string) =>
+  spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", resolve(import.meta.dirname, "crash-child.ts"), mode, db],
+    { encoding: "utf8" },
+  );
+const memoryAt = (db: string) => new IdentityMemory(PROFILE, db, { surface: "test", clock: new InjectedClock() });
+function seeded(db: string): void {
+  const m = memoryAt(db);
+  m.bootstrap();
+  m.logPhase("base0", { title: "Base", summary: "shared", cues: ["shared"] });
+  m.logPhase("aa", { title: "A", summary: "shared", cues: ["shared"] });
+  m.logPhase("bb", { title: "B", summary: "shared", cues: ["shared"] });
+  m.close();
+}
+
+test("WallClock emits strict Python-shaped microseconds across stalls and wall jumps", () => {
+  let now = 1_000;
+  const clock = new WallClock(() => now);
+  assert.equal(clock.micros(), "1970-01-01T00:00:01.000000+00:00");
+  assert.equal(clock.micros(), "1970-01-01T00:00:01.000001+00:00");
+  now = 999;
+  assert.equal(clock.micros(), "1970-01-01T00:00:01.000002+00:00");
+  now = 2_000;
+  assert.equal(clock.micros(), "1970-01-01T00:00:02.000000+00:00");
+  assert.match(clock.micros(), /\.000001\+00:00$/u);
+  const injected = new InjectedClock();
+  assert.equal(injected.seconds(), "2026-09-30T00:00:00+00:00");
+  assert.equal(injected.micros(), "2026-09-30T00:00:00.000001+00:00");
+});
+test("round6 uses exact binary half-even", () => {
+  assert.equal(pyFixed(1.2345665, 6), "1.234566");
+  assert.equal(pyFixed(1.2345675, 6), "1.234568");
+  assert.equal(Number(pyFixed(2.675, 2)), 2.67);
+});
+
+test("process exit after create revision rolls back the whole transaction", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-crash-create-")),
+    db = resolve(dir, "store.sqlite3"),
+    store = new MemoryStore(db);
+  store.initialize();
+  store.close();
+  const out = child("create", db);
+  assert.equal(out.status, 91);
+  const reopened = new MemoryStore(db);
+  assert.equal(reopened.currentView("crash-create").length, 0);
+  assert.equal(reopened.all("SELECT * FROM memory_operations_v3 WHERE idempotency_key='crash:create'").length, 0);
+  reopened.close();
+});
+
+test("process exit after first maintenance adjustment rolls back adjustment and operation", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-crash-maint-")),
+    db = resolve(dir, "store.sqlite3");
+  seeded(db);
+  const before = new MemoryStore(db),
+    a = before.currentView("phase:aa")[0].accessibility,
+    b = before.currentView("phase:bb")[0].accessibility;
+  before.close();
+  const out = child("maintenance", db);
+  assert.equal(out.status, 92);
+  const reopened = new MemoryStore(db);
+  assert.equal(reopened.currentView("phase:aa")[0].accessibility, a);
+  assert.equal(reopened.currentView("phase:bb")[0].accessibility, b);
+  assert.equal(
+    reopened.all("SELECT * FROM memory_operations_v3 WHERE idempotency_key='maintenance:crash-maintenance'").length,
+    0,
+  );
+  reopened.close();
+});
+
+test("G12 process exit leaves one access commit and retry differs only by that access", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-crash-retrieve-")),
+    db = resolve(dir, "store.sqlite3"),
+    baselineDb = resolve(dir, "baseline.sqlite3");
+  seeded(db);
+  cpSync(db, baselineDb);
+  const baseline = memoryAt(baselineDb),
+    baselineResult = baseline.retrieve("shared", { track: true, limit: 10 }) as any;
+  baseline.close();
+  const out = child("retrieve", db);
+  assert.equal(out.status, 93);
+  let store = new MemoryStore(db);
+  assert.equal(store.all("SELECT * FROM memory_access_v3").length, 1);
+  assert.equal(
+    store.all("SELECT * FROM memory_operations_v3 WHERE idempotency_key LIKE 'maintenance:recall:%'").length,
+    0,
+  );
+  const first = store.all("SELECT record_id,access_count FROM memory_current_v3 WHERE access_count>0");
+  assert.equal(first.length, 1);
+  assert.equal(first[0].access_count, 1);
+  store.close();
+  const retry = memoryAt(db),
+    retryResult = retry.retrieve("shared", { track: true, limit: 10 }) as any;
+  retry.close();
+  assert.deepEqual(
+    retryResult.items.map((x: any) => x.record_id),
+    baselineResult.items.map((x: any) => x.record_id),
+  );
+  store = new MemoryStore(db);
+  const baseStore = new MemoryStore(baselineDb),
+    extra = store.all("SELECT * FROM memory_access_v3").length - baseStore.all("SELECT * FROM memory_access_v3").length;
+  assert.equal(extra, 1);
+  const actual = store
+      .currentView()
+      .map((r) => ({ id: r.record_id, accessibility: r.accessibility, stability: r.stability, count: r.access_count })),
+    expected = baseStore
+      .currentView()
+      .map((r) => ({ id: r.record_id, accessibility: r.accessibility, stability: r.stability, count: r.access_count }));
+  let countDelta = 0;
+  for (let i = 0; i < actual.length; i++) {
+    assert.equal(actual[i].id, expected[i].id);
+    assert.equal(actual[i].accessibility, expected[i].accessibility);
+    assert.equal(actual[i].stability, expected[i].stability);
+    const delta = Number(actual[i].count) - Number(expected[i].count);
+    assert.ok(delta === 0 || delta === 1);
+    countDelta += delta;
+  }
+  assert.equal(countDelta, 1);
+  assert.deepEqual(
+    store.all(
+      "SELECT idempotency_key,decision,details_json FROM memory_operations_v3 WHERE idempotency_key LIKE 'maintenance:recall:%'",
+    ),
+    baseStore.all(
+      "SELECT idempotency_key,decision,details_json FROM memory_operations_v3 WHERE idempotency_key LIKE 'maintenance:recall:%'",
+    ),
+  );
+  store.close();
+  baseStore.close();
+});
+
+test("G10 phase crash commits record and identical retry converges with uninterrupted semantics", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-crash-phase-")),
+    db = resolve(dir, "store.sqlite3"),
+    baselineDb = resolve(dir, "baseline.sqlite3");
+  seeded(db);
+  cpSync(db, baselineDb);
+  const clean = memoryAt(baselineDb);
+  clean.logPhase("crash", {
+    title: "Crash phase",
+    summary: "shared",
+    follows: ["phase:base0"],
+    openLoop: true,
+    cues: ["crash cue"],
+  });
+  clean.close();
+  const out = child("phase", db);
+  assert.equal(out.status, 94);
+  let store = new MemoryStore(db);
+  assert.equal(store.currentView("phase:crash").length, 1);
+  assert.equal(store.activeRelationRows().filter((r) => r.from_record_id === "phase:crash").length, 0);
+  assert.equal(store.all("SELECT * FROM memory_cues_v3 WHERE target_record_id='phase:crash'").length, 0);
+  store.close();
+  const retry = memoryAt(db),
+    result = retry.logPhase("crash", {
+      title: "Crash phase",
+      summary: "shared",
+      follows: ["phase:base0"],
+      openLoop: true,
+      cues: ["crash cue"],
+    });
+  assert.equal(result.status, "exists");
+  retry.close();
+  store = new MemoryStore(db);
+  const baseline = new MemoryStore(baselineDb),
+    semantic = (x: MemoryStore) => ({
+      record: x
+        .currentView("phase:crash")
+        .map((r) => [r.record_id, r.title, r.summary, r.content, r.impact, r.confidence, r.authority_status]),
+      relations: x
+        .activeRelationRows()
+        .filter((r) => r.from_record_id === "phase:crash")
+        .map((r) => [r.relation_type, r.to_record_id, r.weight]),
+      cues: x
+        .all(
+          "SELECT cue,cue_norm,target_record_id,weight FROM memory_cues_v3 WHERE target_record_id='phase:crash' ORDER BY cue",
+        )
+        .map((r) => [r.cue, r.cue_norm, r.target_record_id, r.weight]),
+    });
+  assert.deepEqual(semantic(store), semantic(baseline));
+  store.close();
+  baseline.close();
+});
+
+test("G9 decay commits maintenance before a sidecar write failure", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-g9-")),
+    db = resolve(dir, "store.sqlite3"),
+    m = memoryAt(db);
+  m.bootstrap();
+  m.logPhase("old", { title: "Old", summary: "old" });
+  const before = Number(m.store.currentView("phase:old")[0].accessibility);
+  hooks.beforeDecaySidecarWrite = () => {
+    throw new Error("sidecar write failed");
+  };
+  try {
+    assert.throws(() => m.decay("2100-01-01T00:00:00+00:00"), /sidecar write failed/u);
+  } finally {
+    hooks.beforeDecaySidecarWrite = null;
+  }
+  const after = Number(m.store.currentView("phase:old")[0].accessibility);
+  assert.ok(after < before);
+  assert.equal(
+    m.store.all("SELECT * FROM memory_operations_v3 WHERE idempotency_key LIKE 'maintenance:decay:%'").length,
+    1,
+  );
+  m.close();
+});
+
+test("migration rejects WAL sidecars, foreign and future sources before target creation", () => {
+  for (const kind of ["wal", "foreign", "future"]) {
+    const dir = mkdtempSync(resolve(tmpdir(), `r2b-migrate-${kind}-`)),
+      source = resolve(dir, "source.sqlite3"),
+      target = resolve(dir, "target.sqlite3");
+    cpSync(resolve(ROOT, "spec", "golden", "identity-open", "store.sqlite3"), source);
+    if (kind === "wal") writeFileSync(source + "-wal", "");
+    else {
+      const bytes = readFileSync(source);
+      if (kind === "foreign") bytes.writeInt32BE(123, 68);
+      else bytes.writeInt32BE(99, 60);
+      writeFileSync(source, bytes);
+    }
+    assert.throws(() => new MemoryStore(source).migrateTo(target));
+    assert.equal(existsSync(target), false);
+  }
+});
+
+test("default retrieve on an uninitialized store stays a pure read", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-fresh-")),
+    memory = memoryAt(resolve(dir, "fresh.sqlite3"));
+  const packet = memory.retrieve("hello") as any; // default track=true
+  memory.close();
+  assert.deepEqual(packet.items, []);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test("decay sidecar bytes match Python json.dumps (default separators, micros only when non-zero)", () => {
+  const dir = mkdtempSync(resolve(tmpdir(), "r2b-sidecar-")),
+    db = resolve(dir, "store.sqlite3"),
+    m = memoryAt(db);
+  m.bootstrap();
+  m.decay("2026-10-21T00:00:00Z");
+  // Python: json.dumps({"last_decay_at": moment.isoformat()}) — pinned in tests/test_r2b_oracle_patches.py.
+  assert.equal(
+    readFileSync(resolve(dir, "store.activation.json"), "utf8"),
+    '{"last_decay_at": "2026-10-21T00:00:00+00:00"}',
+  );
+  m.decay("2026-10-22T00:00:00.000500+00:00");
+  assert.equal(
+    readFileSync(resolve(dir, "store.activation.json"), "utf8"),
+    '{"last_decay_at": "2026-10-22T00:00:00.000500+00:00"}',
+  );
+  m.close();
+});

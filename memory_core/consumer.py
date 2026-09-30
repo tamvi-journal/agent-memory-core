@@ -102,6 +102,8 @@ class ConsumerMemory:
         )
 
     def bootstrap(self) -> list[dict[str, Any]]:
+        self.runtime.store.require_writable(allow_uninitialized=True)
+        self.runtime.store.initialize()
         return [self.runtime.submit(**seed) for seed in self.bundle.seeds]
 
     def candidate_context(

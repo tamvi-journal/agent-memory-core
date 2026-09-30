@@ -1,0 +1,333 @@
+import { createHash } from "node:crypto";
+import {
+  hashPayload,
+  orderedObject,
+  pyFloat,
+  pyInt,
+  pyJsonDumps,
+  toJsonValue,
+  type JsonValue,
+  type PyFloat,
+  type PyInt,
+} from "./encoding.ts";
+import { insertEvidence, linkEvidence, semanticHash, type Evidence, type Numeric } from "./kernel.ts";
+import type { MemoryStore, Row } from "./store.ts";
+import { parseLossless } from "./json.ts";
+import { ValueError } from "./errors.ts";
+
+const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
+const num = (v: Numeric | undefined, d = 0) =>
+  v === undefined ? d : typeof v === "number" ? v : v.kind === "int" ? Number(v.value) : v.value;
+const typed = (v: unknown): JsonValue => toJsonValue(v);
+const plain = (v: unknown): unknown => {
+  if (v && typeof v === "object" && "kind" in v) {
+    const x = v as JsonValue;
+    if (Array.isArray(x)) return x.map(plain);
+    if ((x as any).kind === "int") return Number((x as PyInt).value);
+    if ((x as any).kind === "float") return (x as PyFloat).value;
+    if ((x as any).kind === "object")
+      return Object.fromEntries((x as any).entries.map(([k, i]: [string, JsonValue]) => [k, plain(i)]));
+  }
+  if (Array.isArray(v)) return v.map(plain);
+  if (v && typeof v === "object")
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, i]) => [k, plain(i)]));
+  return v;
+};
+export type GovernancePolicy = {
+  eventMinConfidence: number;
+  beliefMinConfidence: number;
+  axisMinConfidence: number;
+  axisMinIndependentSources: number;
+  protectedDomains: string[];
+  protectedSafeEffects: string[];
+  protectedEffectsRequiringAuthority: string[];
+};
+export const DEFAULT_POLICY: GovernancePolicy = {
+  eventMinConfidence: 0.6,
+  beliefMinConfidence: 0.7,
+  axisMinConfidence: 0.75,
+  axisMinIndependentSources: 2,
+  protectedDomains: ["boundary"],
+  protectedSafeEffects: ["strengthen", "clarify"],
+  protectedEffectsRequiringAuthority: ["weaken", "delete", "reduce_autonomy"],
+};
+export const SELF_AUTHORED_POLICY: GovernancePolicy = {
+  ...DEFAULT_POLICY,
+  eventMinConfidence: 0,
+  beliefMinConfidence: 0,
+  axisMinConfidence: 0,
+  axisMinIndependentSources: 1,
+  protectedDomains: [],
+};
+export type IntakeProposal = {
+  operation_type: string;
+  record_id: string;
+  record_class?: string | null;
+  domain?: string | null;
+  scope?: string;
+  actor: string;
+  model_family?: string;
+  reason: string;
+  logic: string;
+  truth_basis: string;
+  falsifier?: string;
+  unresolved_conflict?: boolean;
+  protected_effect?: string;
+  protected_authorized?: boolean;
+  changes: Record<string, unknown>;
+  evidence: Evidence[];
+  idempotency_key: string;
+};
+
+function identityGroup(item: Evidence): string {
+  const source = String(item.source_ref ?? "");
+  const raw = String(item.independence_group ?? source ?? String(item.source_family ?? ""));
+  return (
+    raw
+      .toLowerCase()
+      .replace(/[^a-z0-9._/-]+/gu, "-")
+      .replace(/^-+|-+$/gu, "") || "unknown-source"
+  );
+}
+function resultRow(row: Row): Record<string, unknown> {
+  const result: { [k: string]: unknown } = { ...row };
+  result.evidence_ids = plain(parseLossless(String(result.evidence_ids_json ?? "[]")));
+  delete result.evidence_ids_json;
+  return result;
+}
+
+export class ValidatedIntake {
+  readonly store: MemoryStore;
+  readonly surface: string;
+  readonly policy: GovernancePolicy;
+  constructor(store: MemoryStore, options: { surface: string; policy?: GovernancePolicy }) {
+    this.store = store;
+    this.surface = options.surface;
+    this.policy = options.policy ?? DEFAULT_POLICY;
+  }
+  normalized(value: IntakeProposal): Record<string, unknown> {
+    return {
+      operation_type: value.operation_type,
+      record_id: value.record_id,
+      record_class: value.record_class ?? null,
+      domain: value.domain ?? null,
+      scope: value.scope ?? "global",
+      actor: value.actor,
+      surface: this.surface,
+      model_family: value.model_family ?? "",
+      reason: value.reason,
+      logic: value.logic,
+      truth_basis: value.truth_basis,
+      falsifier: value.falsifier ?? "",
+      unresolved_conflict: Boolean(value.unresolved_conflict ?? false),
+      protected_effect: value.protected_effect ?? "neutral",
+      protected_authorized: Boolean(value.protected_authorized ?? false),
+      changes: value.changes ?? {},
+      evidence: value.evidence ?? [],
+      idempotency_key: value.idempotency_key ?? "",
+    };
+  }
+  validate(p: any): void {
+    if (!["create", "correct", "refine", "supersede", "invalidate"].includes(p.operation_type))
+      throw new ValueError("unsupported operation_type");
+    for (const n of ["record_id", "actor", "reason", "logic", "truth_basis", "idempotency_key"])
+      if (typeof p[n] !== "string" || !p[n].trim()) throw new ValueError(`${n} must be non-empty text`);
+    if (!p.evidence.length) throw new ValueError("at least one provenance-bearing evidence item is required");
+    for (const e of p.evidence) {
+      if (!e.source_ref || !e.content_summary)
+        throw new ValueError("each evidence item requires source_ref and content_summary");
+      const c = num(e.confidence as Numeric | undefined);
+      if (c < 0 || c > 1) throw new ValueError("evidence confidence must be between 0 and 1");
+    }
+    if (p.operation_type === "create") {
+      if (!["event", "belief", "axis"].includes(p.record_class))
+        throw new ValueError("create requires event, belief, or axis");
+      if (!p.domain || !p.changes.title) throw new ValueError("create requires domain and changes.title");
+      if (this.store.currentView(p.record_id).length || this.store.historicalView(p.record_id).length)
+        throw new ValueError("record already exists");
+    } else if (!this.store.historicalView(p.record_id).length) throw new ValueError("target record does not exist");
+  }
+  evaluate(p: any): [string, string] {
+    const current = this.store.currentView(p.record_id)[0];
+    const recordClass = p.record_class ?? current?.record_class ?? "",
+      domain = p.domain ?? current?.domain ?? "";
+    const protectedRecord =
+      this.policy.protectedDomains.includes(domain) || (current && current.authority_status === "protected");
+    if (protectedRecord && !p.protected_authorized) {
+      const weakening =
+        p.operation_type === "invalidate" ||
+        this.policy.protectedEffectsRequiringAuthority.includes(p.protected_effect) ||
+        (current?.authority_status === "protected" && (p.changes.authority_status ?? "protected") !== "protected");
+      if (weakening) return ["held", "protected weakening requires host authority"];
+      if (p.operation_type !== "create" && !this.policy.protectedSafeEffects.includes(p.protected_effect))
+        return ["held", "protected revisions must declare a configured safe effect"];
+    }
+    if (p.unresolved_conflict) return ["held", "unresolved contradictory evidence"];
+    const min =
+      recordClass === "event"
+        ? this.policy.eventMinConfidence
+        : recordClass === "axis"
+          ? this.policy.axisMinConfidence
+          : this.policy.beliefMinConfidence;
+    if (Math.min(...p.evidence.map((e: Evidence) => num(e.confidence as Numeric | undefined))) < min)
+      return ["held", `evidence confidence is below ${min.toFixed(2)}`];
+    if (recordClass === "axis") {
+      if (!String(p.falsifier).trim()) return ["held", "axis evolution requires an explicit falsifier"];
+      if (new Set(p.evidence.map(identityGroup)).size < this.policy.axisMinIndependentSources)
+        return ["held", "axis evolution lacks independent evidence"];
+    }
+    if (["correct", "refine", "supersede"].includes(p.operation_type) && current) {
+      const desired = {
+        title: current.title,
+        summary: current.summary,
+        content: current.content,
+        impact: current.impact,
+        confidence: current.confidence,
+        authority_status: current.authority_status,
+        ...p.changes,
+      };
+      if (semanticHash(desired) === current.content_sha256)
+        return ["no_op", "proposal does not change semantic content"];
+    }
+    return ["materialized", "logic, truth basis, provenance, and evidence passed"];
+  }
+  submit(value: IntakeProposal): Record<string, unknown> {
+    this.store.requireWritable();
+    const p: any = this.normalized(value);
+    this.store.guardPinned(p.record_id);
+    const proposalSha = hashPayload(typed(p));
+    const prior = this.store.all("SELECT * FROM memory_intake_v3 WHERE idempotency_key=?", p.idempotency_key)[0];
+    if (prior) {
+      if (prior.proposal_sha256 !== proposalSha)
+        throw new ValueError("idempotency_key already exists with a different proposal");
+      return this.intake(String(p.idempotency_key));
+    }
+    this.validate(p);
+    const [status, reason] = this.evaluate(p);
+    const evidenceIds = this.store.transaction((db) =>
+      p.evidence.map((item: Evidence) =>
+        insertEvidence(this.store, db, {
+          ...item,
+          actor: item.actor ?? p.actor,
+          surface: item.surface ?? this.surface,
+          model_family: item.model_family ?? p.model_family,
+          privacy_class: item.privacy_class ?? "private",
+        }),
+      ),
+    );
+    const intakeId = `intake:${sha256(p.idempotency_key).slice(0, 32)}`,
+      target = p.operation_type === "create" ? null : p.record_id;
+    this.store.transaction((db) =>
+      db
+        .prepare(
+          "INSERT INTO memory_intake_v3(intake_id,operation_type,target_record_id,proposal_sha256,evidence_ids_json,status,decision_reason,operation_id,actor,surface,idempotency_key,created_at,decided_at) VALUES(?,?,?,?,?,'received','',NULL,?,?,?,?,NULL)",
+        )
+        .run(
+          intakeId,
+          p.operation_type,
+          target,
+          proposalSha,
+          pyJsonDumps(evidenceIds),
+          p.actor,
+          this.surface,
+          p.idempotency_key,
+          this.store.now(),
+        ),
+    );
+    if (["held", "rejected", "no_op"].includes(status)) {
+      this.decide(intakeId, status, reason, target, null);
+      return this.intake(p.idempotency_key);
+    }
+    const primary = {
+      ...p.evidence[0],
+      actor: p.evidence[0].actor ?? p.actor,
+      surface: p.evidence[0].surface ?? this.surface,
+      model_family: p.evidence[0].model_family ?? p.model_family,
+      privacy_class: p.evidence[0].privacy_class ?? "private",
+    };
+    let result: Record<string, unknown>;
+    const key = `intake:${p.idempotency_key}`;
+    if (p.operation_type === "create")
+      result = this.store.createCurrent({
+        recordId: p.record_id,
+        recordClass: p.record_class,
+        domain: p.domain,
+        title: String(p.changes.title ?? ""),
+        summary: String(p.changes.summary ?? ""),
+        content: String(p.changes.content ?? ""),
+        impact: String(p.changes.impact ?? ""),
+        confidence: p.changes.confidence ?? 0.7,
+        salience: p.changes.salience ?? 0.5,
+        stability: p.changes.stability ?? 0.5,
+        accessibility: p.changes.accessibility ?? 0.5,
+        authorityStatus: String(
+          p.changes.authority_status ??
+            (this.policy.protectedDomains.includes(p.domain) ? "protected" : "canonical_reference"),
+        ),
+        scope: p.scope,
+        actor: p.actor,
+        surface: this.surface,
+        modelFamily: p.model_family,
+        reason: p.reason,
+        evidence: primary,
+        idempotencyKey: key,
+      });
+    else if (p.operation_type === "invalidate")
+      result = this.store.invalidate({
+        recordId: p.record_id,
+        actor: p.actor,
+        surface: this.surface,
+        reason: p.reason,
+        evidence: primary,
+        idempotencyKey: key,
+      });
+    else
+      result = this.store.revise({
+        recordId: p.record_id,
+        operationType: p.operation_type,
+        actor: p.actor,
+        surface: this.surface,
+        modelFamily: p.model_family,
+        reason: p.reason,
+        evidence: primary,
+        idempotencyKey: key,
+        changes: p.changes,
+      });
+    if (result.target_revision_id)
+      this.store.transaction((db) => {
+        for (const id of evidenceIds) linkEvidence(db, String(result.target_revision_id), id, "supports", p.reason);
+      });
+    this.decide(intakeId, "materialized", reason, p.record_id, String(result.operation_id));
+    return this.intake(p.idempotency_key);
+  }
+  decide(id: string, status: string, reason: string, target: string | null, operation: string | null): void {
+    this.store.transaction((db) =>
+      db
+        .prepare(
+          "UPDATE memory_intake_v3 SET status=?,decision_reason=?,target_record_id=?,operation_id=?,decided_at=? WHERE intake_id=?",
+        )
+        .run(status, reason, target, operation, this.store.now(), id),
+    );
+  }
+  intake(key: string): Record<string, unknown> {
+    const x = this.store.all("SELECT * FROM memory_intake_v3 WHERE idempotency_key=?", key)[0];
+    return resultRow(x);
+  }
+}
+
+export class MemoryRuntime {
+  readonly store: MemoryStore;
+  readonly intake: ValidatedIntake;
+  constructor(store: MemoryStore, options: { surface: string; policy?: GovernancePolicy }) {
+    this.store = store;
+    this.intake = new ValidatedIntake(store, options);
+  }
+  submit(p: IntakeProposal) {
+    this.store.requireWritable();
+    return this.intake.submit(p);
+  }
+  applyMaintenance(input: Parameters<MemoryStore["applyMaintenance"]>[0]) {
+    this.store.requireWritable();
+    return this.store.applyMaintenance(input);
+  }
+}

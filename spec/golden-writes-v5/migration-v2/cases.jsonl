@@ -1,0 +1,1 @@
+{"label":"migration-v2","results":[{"call":"migrate","index":0,"result":{"backup_byte_identical":true,"backup_name":"backup-v2.sqlite3","dry_run":{"dry_run":true,"from":"legacy-v2","state":"ready"},"preflight_refusals":["wal:IncompatibleJournalMode","foreign:MigrationRequiredError","future:MigrationRequiredError"],"source_unchanged":true,"state":"ready"}}]}

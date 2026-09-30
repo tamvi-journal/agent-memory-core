@@ -32,6 +32,7 @@ def evidence(label: str, **overrides) -> dict:
 
 def create_claim(path, record_id: str = "claim"):
     store = MemoryStore(path)
+    store.initialize()
     intake = ValidatedIntake(store, surface="test")
     intake.submit(
         operation_type="create",

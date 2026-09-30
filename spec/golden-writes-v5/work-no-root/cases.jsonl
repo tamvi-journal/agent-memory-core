@@ -1,0 +1,1 @@
+{"label":"work-no-root","results":[{"call":"bootstrap","index":0,"result":{"db":"store.sqlite3","profile":"example","records":{"anchor:discussions":"materialized","anchor:open-loops":"materialized","core":"materialized","vho-open-ontology-core":"materialized"}}},{"call":"log_phase","index":1,"result":{"linked":{},"record_id":"phase:plain-work","status":"logged"}}]}
