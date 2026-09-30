@@ -59,7 +59,7 @@ jobs:
       - name: Install and test Unicode 14 tables
         run: |
           python -m pip install -e ".[test]"
-          python -m pytest -q tests/test_r0b_oracle.py tests/test_title_table.py tests/test_authority_corpus.py tests/test_r0_corpus_on_v5.py
+          python -m pytest -q tests/test_r0b_oracle.py tests/test_title_table.py tests/test_authority_corpus.py tests/test_r0_corpus_on_v5.py tests/test_v4_read_surfaces.py
 
   authority-corpus:
     name: ubuntu / py3.11 / authority-v2 corpus

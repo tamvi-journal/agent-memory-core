@@ -161,7 +161,10 @@ def main(argv: list[str] | None = None) -> None:
     elif command == "view":
         from .view import serve
 
-        memory.bootstrap()
+        # Read-only surface: bootstrap only a fresh store (as view.snapshot does);
+        # a legacy-v4 store goes straight to serve.
+        if memory.store.schema_info()["state"] == "uninitialized":
+            memory.bootstrap()
         serve(memory, port=args.port, open_browser=not args.no_browser)
         return
     elif command == "setup":
