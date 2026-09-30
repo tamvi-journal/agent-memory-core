@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_close_legacy_discussion","arguments":{"receipt_id":"receipt:b696813319a359823a94b95ba0e67139"}}}

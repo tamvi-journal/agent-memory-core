@@ -1,0 +1,4 @@
+{"jsonrpc": "2.0", "id": 1, "error": {"code": -32602, "message": "Invalid params"}}
+{"jsonrpc": "2.0", "id": 2, "error": {"code": -32602, "message": "Invalid params"}}
+{"jsonrpc": "2.0", "id": 3, "error": {"code": -32602, "message": "Invalid params"}}
+{"jsonrpc": "2.0", "id": 4, "result": {"content": [{"type": "text", "text": "ValueError: unknown tool: unknown"}], "isError": true}}

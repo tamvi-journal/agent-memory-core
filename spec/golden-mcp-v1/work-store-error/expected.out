@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "WorkStoreError: unsupported work state schema in work/state.json: 'wrong'"}], "isError": true}}

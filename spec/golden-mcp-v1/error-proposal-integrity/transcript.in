@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_core_apply","arguments":{"receipt_id":"receipt:5c22bca15e0944e7da8bf3eb4ad1c911"}}}

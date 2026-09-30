@@ -1,0 +1,10 @@
+{"jsonrpc": "2.0", "id": 0, "result": {}}
+{"jsonrpc": "2.0", "id": 9007199254740993, "result": {}}
+{"jsonrpc": "2.0", "id": "x", "result": {}}
+{"jsonrpc": "2.0", "id": null, "result": {}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "Invalid Request"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "Invalid Request"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "Invalid Request"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "Invalid Request"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "Invalid Request"}}
+{"jsonrpc": "2.0", "id": "safe", "error": {"code": -32600, "message": "Invalid Request"}}
