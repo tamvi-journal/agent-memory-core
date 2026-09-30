@@ -115,14 +115,48 @@ class MemoryStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
 
-    @contextmanager
-    def _raw_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
+    def _preflight(self, *, readonly: bool) -> None:
+        """Refuse WAL and foreign files before SQLite ever opens them.
+
+        Opening a WAL database, even ``mode=ro``, can create ``-wal``/``-shm``
+        sidecars, and a writable open of a file this store does not own could
+        leave them behind on a crash. So the decision is made from the file
+        header bytes alone; the PRAGMA checks after open stay as defense in
+        depth.
+        """
+
         repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
         resolved = self.db_path.resolve()
         if readonly and any(
             Path(f"{resolved}{suffix}").exists() for suffix in ("-wal", "-shm")
         ):
             raise IncompatibleJournalMode(f"SQLite WAL sidecar present. {repair}")
+        try:
+            with open(resolved, "rb") as handle:
+                header = handle.read(100)
+        except FileNotFoundError:
+            return
+        if len(header) < 100 or header[:16] != b"SQLite format 3\x00":
+            # Empty or not a SQLite file: nothing to decide from the header;
+            # SQLite itself reports it (an empty file is an empty database).
+            return
+        wal = header[18] == 2 or header[19] == 2
+        user_version = int.from_bytes(header[60:64], "big", signed=True)
+        application_id = int.from_bytes(header[68:72], "big", signed=True)
+        if readonly:
+            if wal:
+                raise IncompatibleJournalMode(f"SQLite journal_mode=wal. {repair}")
+            return
+        if application_id not in {0, APPLICATION_ID} or user_version > SCHEMA_VERSION:
+            raise SchemaVersionError(
+                "database application_id/user_version is newer or foreign"
+            )
+
+    @contextmanager
+    def _raw_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
+        repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
+        resolved = self.db_path.resolve()
+        self._preflight(readonly=readonly)
         if readonly:
             uri = f"{resolved.as_uri()}?mode=ro"
             conn = sqlite3.connect(uri, uri=True)

@@ -41,8 +41,9 @@ These were probed on Python 3.11.15 / Unicode 14.0.0 and Node 22. Each one is a 
 - **Connection pragmas.**
   - `foreign_keys=ON` on every connection.
   - **Journal mode is asserted, not assumed (F2).** The declared mode is `DELETE`. A persisted mode can differ in an existing file (WAL is stored in the header), so:
-    - on a writable open, the runtime reads `PRAGMA journal_mode`; if it is not `delete`, it sets `PRAGMA journal_mode=DELETE` deliberately and verifies the result, failing closed if SQLite refuses;
-    - on a read-only open, a persisted `wal` mode, or a `-wal`/`-shm` sidecar next to the file, fails closed with a typed error (`IncompatibleJournalMode`) that names the explicit repair command. Read paths never convert;
+    - **the decision is made before SQLite opens the file**, from the header bytes: magic `SQLite format 3\0`, write/read versions at bytes 18/19 (2 = WAL), `user_version` at 60–63 and `application_id` at 68–71 (big-endian). Opening a WAL database, even `mode=ro`, can create `-wal`/`-shm` sidecars that stay behind, so a read that refuses must refuse before the open;
+    - on a writable open, a foreign `application_id` or a `user_version` above 4 is refused before the open. Otherwise the runtime reads `PRAGMA journal_mode`; if it is not `delete`, it sets `PRAGMA journal_mode=DELETE` deliberately and verifies the result, failing closed if SQLite refuses;
+    - on a read-only open, a WAL header, or a `-wal`/`-shm` sidecar next to the file, fails closed before the open with a typed error (`IncompatibleJournalMode`) that names the explicit repair command. Read paths never convert;
     - the oracle gets the same check, shipped with P3's PR as a fail-closed guard that changes no stored data.
   - Busy timeout is 5000 ms, matching Python's `sqlite3.connect` default.
 - **Opening rules** (same as the oracle):
@@ -495,7 +496,7 @@ For each scenario it writes `spec/golden/<scenario>/`:
 `spec/golden/MANIFEST.json` holds:
 
 - the sha256 of every file, including the two normalizer tables;
-- the oracle commit;
+- oracle provenance: `oracle_base_commit` (`def576d`), `oracle_semantics` (the R0b patch list: P1, P2, P3, F2) and `oracle_source_sha256` over the per-file sha256 of every source whose behaviour reaches the artifacts (`memory_core`, the identity modules used by the scenarios, the example profile, and both generators). A commit that predates the patches is never named as the oracle;
 - the Python version, the Unicode version and Python's `sqlite3.sqlite_version`;
 - for conformance runs, the Node version and the `node:sqlite` SQLite version.
 

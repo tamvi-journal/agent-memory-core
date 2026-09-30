@@ -30,7 +30,33 @@ from memory_core import (  # noqa: E402
 from trajecta_identity import IdentityMemory, load_profile  # noqa: E402
 
 START = datetime(2026, 9, 30, 0, 0, 0, tzinfo=timezone.utc)
-ORACLE_COMMIT = "def576d"
+# Provenance (Lam, R0b review): the corpus is produced by the def576d oracle
+# plus the R0b patches, so the MANIFEST names the base commit, the patch set,
+# and a digest of every source file whose behaviour reaches the artifacts.
+ORACLE_BASE_COMMIT = "def576d"
+ORACLE_SEMANTICS = ["P1-sorted-frontier", "P2-cue-id-order", "P3-frozen-u14-tables", "F2-journal-preflight"]
+ORACLE_SOURCES = (
+    "memory_core/*.py",
+    "memory_core/schema.sql",
+    "trajecta_identity/activation.py",
+    "trajecta_identity/identity.py",
+    "trajecta_identity/paths.py",
+    "trajecta_identity/profile.py",
+    "trajecta_identity/work.py",
+    "trajecta_identity/profiles/example/profile.json",
+    "tools/golden/generate.py",
+    "tools/norm_tables/generate.py",
+)
+
+
+def oracle_sources() -> dict:
+    """sha256 of each oracle source file, keyed by its POSIX path."""
+
+    paths = sorted({path for pattern in ORACLE_SOURCES for path in ROOT.glob(pattern)})
+    files = {path.relative_to(ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+             for path in paths}
+    listing = "".join(f"{name}\0{digest}\n" for name, digest in sorted(files.items()))
+    return {"files": files, "sha256": hashlib.sha256(listing.encode("utf-8")).hexdigest()}
 
 
 def canonical(value: object) -> str:
@@ -539,9 +565,13 @@ def generate(output: Path):
 
     corpus = sorted(path for path in output.rglob("*") if path.is_file())
     tables = sorted((ROOT / "memory_core" / "tables").glob("*.json"))
+    sources = oracle_sources()
     manifest = {
         "schema": "trajecta.golden-manifest/v1",
-        "oracle_commit": ORACLE_COMMIT,
+        "oracle_base_commit": ORACLE_BASE_COMMIT,
+        "oracle_semantics": ORACLE_SEMANTICS,
+        "oracle_source_sha256": sources["sha256"],
+        "oracle_sources": sources["files"],
         "python": sys.version.split()[0],
         "unicode": unicodedata.unidata_version,
         "sqlite": sqlite3.sqlite_version,

@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from memory_core import CueDrivenRetriever, IncompatibleJournalMode, MemoryProfile, MemoryStore
+from memory_core import (
+    CueDrivenRetriever,
+    IncompatibleJournalMode,
+    MemoryProfile,
+    MemoryStore,
+    SchemaVersionError,
+)
 from memory_core import text as frozen
 
 
@@ -122,18 +128,62 @@ def test_readonly_rejects_sidecars(tmp_path: Path, suffix: str):
         store.current_view()
 
 
-def test_writable_open_never_rewrites_a_foreign_wal_header(tmp_path: Path):
-    path = tmp_path / "foreign.sqlite3"
-    with sqlite3.connect(path) as conn:
-        conn.execute("PRAGMA application_id=1234")
-        conn.execute("CREATE TABLE t(x)")
+def _wal_store(path: Path, *, application_id: int | None = None, user_version: int | None = None) -> None:
+    """A store whose header says WAL, closed cleanly so no sidecars remain."""
+
+    MemoryStore(path).initialize()
+    conn = sqlite3.connect(path)
+    try:
+        if application_id is not None:
+            conn.execute(f"PRAGMA application_id={application_id}")
+        if user_version is not None:
+            conn.execute(f"PRAGMA user_version={user_version}")
         assert conn.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
-    conn.close()
-    before = path.read_bytes()
-    from memory_core import SchemaVersionError
-    with pytest.raises(SchemaVersionError, match="foreign"):
+    finally:
+        conn.close()
+
+
+def _snapshot(path: Path) -> tuple[list[str], bytes]:
+    return sorted(p.name for p in path.parent.iterdir()), path.read_bytes()
+
+
+def test_readonly_wal_refused_before_sqlite_opens(tmp_path: Path):
+    path = tmp_path / "store.sqlite3"
+    _wal_store(path)
+    before = _snapshot(path)
+    assert before[0] == ["store.sqlite3"]
+    with pytest.raises(IncompatibleJournalMode, match="journal_mode=wal"):
+        MemoryStore(path).current_view()
+    with pytest.raises(IncompatibleJournalMode):
+        MemoryStore(path).schema_info()
+    assert _snapshot(path) == before
+
+
+@pytest.mark.parametrize(
+    "header",
+    [{"application_id": 1234}, {"user_version": 5}],
+    ids=["foreign", "future"],
+)
+def test_writable_refuses_foreign_or_future_wal_untouched(tmp_path: Path, header):
+    path = tmp_path / "store.sqlite3"
+    _wal_store(path, **header)
+    before = _snapshot(path)
+    assert before[0] == ["store.sqlite3"]
+    with pytest.raises(SchemaVersionError, match="newer or foreign"):
         MemoryStore(path).initialize()
-    assert path.read_bytes() == before
+    assert _snapshot(path) == before
+
+
+def test_owned_wal_converts_to_delete_on_writable_open(tmp_path: Path):
+    path = tmp_path / "store.sqlite3"
+    _wal_store(path)
+    store = MemoryStore(path)
+    assert store.initialize()["changed"] is False
+    assert path.read_bytes()[18:20] == b"\x01\x01"
+    with store.connect() as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+    assert store.current_view() == []
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["store.sqlite3"]
 
 
 def test_vendored_plugin_carries_the_frozen_tables():
