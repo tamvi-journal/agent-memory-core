@@ -1,12 +1,11 @@
 import { compareCodePoint, pyRound, utcNowSeconds } from "./encoding.ts";
+import { AuthorityV2, PINNED, type ProposalInput, type Terminal } from "./authority.ts";
 import { PacketRenderer } from "./packet.ts";
 import { memoryProfile, type IdentityProfile } from "./profile.ts";
 import { CueDrivenRetriever, type MemoryHit } from "./retrieval.ts";
 import { MemoryStore, type Row } from "./store.ts";
 
 export const CAUSAL_RELATIONS = ["later-phase-of", "caused-by", "depends-on", "decided-because"];
-export const PINNED = ["core", "vho-open-ontology-core", "anchor:discussions", "anchor:open-loops"];
-
 const field = (row: Row, key: string): string => String(row[key] ?? "");
 
 function stateOf(row: Row): string {
@@ -36,15 +35,18 @@ export class IdentityMemory {
   readonly surface: string;
   readonly retriever: CueDrivenRetriever;
   readonly renderer: PacketRenderer;
+  readonly authority: AuthorityV2;
   readonly displayDatabase: string;
 
   constructor(profile: IdentityProfile, database: string, options: IdentityOptions = {}) {
     this.profile = profile;
-    this.store = new MemoryStore(database);
+    this.store = new MemoryStore(database, { pinnedGuard: PINNED });
     this.surface = options.surface ?? "local";
     const coreProfile = memoryProfile(profile);
     this.retriever = new CueDrivenRetriever(this.store, coreProfile);
-    this.renderer = new PacketRenderer(coreProfile, options.now ?? utcNowSeconds);
+    const now = options.now ?? utcNowSeconds;
+    this.renderer = new PacketRenderer(coreProfile, now);
+    this.authority = new AuthorityV2(profile, this.store, this.surface, now);
     this.displayDatabase = options.displayDatabase ?? this.store.path;
   }
 
@@ -83,11 +85,27 @@ export class IdentityMemory {
     });
     return {
       schema: "trajecta-identity-packet/v1", profile: this.profile.name, cue, memory_decides_truth: false,
+      open_core_proposals: this.openCoreProposals(),
       open_discussions: this.openDiscussions(), open_loops: this.openLoops(),
       causal_neighbors: this.causalNeighbors(items.map((item) => String(item.record_id))), items,
       self_authored_share: items.length ? pyRound(selfCount / items.length, 2) : 0, packet,
     };
   }
+
+  corePropose(input: ProposalInput): Record<string, unknown> { return this.authority.propose(input); }
+  openCoreProposals(): Record<string, unknown>[] { return this.authority.openProposals(); }
+  issueCoreReceipt(proposalId: string, outcome: "apply" | "reject", decisionNote: string, terminal: Terminal): Record<string, unknown> {
+    return this.authority.issueCore(proposalId, outcome, decisionNote, terminal);
+  }
+  coreApply(receiptId: string): Record<string, unknown> { return this.authority.applyCore(receiptId); }
+  issueRetractReceipt(recordId: string, reason: string, terminal: Terminal): Record<string, unknown> {
+    return this.authority.issueRetract(recordId, reason, terminal);
+  }
+  retract(receiptId: string): Record<string, unknown> { return this.authority.applyRetract(receiptId); }
+  issueLegacyCloseReceipt(note: string, terminal: Terminal): Record<string, unknown> {
+    return this.authority.issueLegacyClose(note, terminal);
+  }
+  closeLegacyDiscussion(receiptId: string): Record<string, unknown> { return this.authority.applyLegacyClose(receiptId); }
 
   openDiscussions(): Record<string, unknown>[] {
     const result: Record<string, unknown>[] = [];
@@ -121,7 +139,7 @@ export class IdentityMemory {
 
   status(): Record<string, unknown> {
     const info = this.store.schemaInfo();
-    const rows = info.state === "ready" ? this.store.currentView() : [];
+    const rows = info.state === "ready" || info.state === "legacy-v4" ? this.store.currentView() : [];
     const activation: Record<string, number> = {};
     const records: Record<string, number> = {};
     for (const row of rows) {
@@ -134,8 +152,9 @@ export class IdentityMemory {
     return {
       schema: "trajecta-identity-status/v1", profile: this.profile.name, agent: this.profile.agent,
       db: this.displayDatabase, store: info.state,
-      write_policy: "self-authored: phase append-only, fact revisable, core revisable + discuss",
+      write_policy: "self-authored proposals; owner receipt controls canonical core",
       records, activation, open_discussions: rows.length ? this.openDiscussions().length : 0,
+      open_core_proposals: rows.length ? this.openCoreProposals().length : 0,
       open_loops: rows.length ? this.openLoops().length : 0, work_store: null,
     };
   }

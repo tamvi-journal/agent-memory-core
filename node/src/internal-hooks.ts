@@ -4,4 +4,7 @@
  * file, so a test can swap the file in that window (TOCTOU) and prove the
  * post-open recheck is authoritative.
  */
-export const hooks: { beforeOpen: ((path: string) => void) | null } = { beforeOpen: null };
+export const hooks: {
+  beforeOpen: ((path: string) => void) | null;
+  afterAuthorityRevisionInsert: (() => void) | null;
+} = { beforeOpen: null, afterAuthorityRevisionInsert: null };

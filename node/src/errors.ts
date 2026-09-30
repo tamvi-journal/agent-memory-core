@@ -18,3 +18,17 @@ export class IncompatibleJournalMode extends SchemaVersionError {
     this.name = "IncompatibleJournalMode";
   }
 }
+
+export class AuthorityError extends Error {
+  constructor(message: string) { super(message); this.name = new.target.name; }
+}
+export class ReceiptNotFound extends AuthorityError {}
+export class ReceiptIntegrityError extends AuthorityError {}
+export class ProposalIntegrityError extends AuthorityError {}
+export class ProposalDecided extends AuthorityError {}
+export class StaleAuthority extends AuthorityError {}
+export class HumanPresenceRequired extends AuthorityError {}
+export class ConfirmationMismatch extends AuthorityError {}
+export class PinnedRecordError extends Error {
+  constructor(message: string) { super(message); this.name = "PinnedRecordError"; }
+}

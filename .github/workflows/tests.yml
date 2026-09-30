@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  node-readonly:
-    name: ${{ matrix.os }} / node22 / read-only conformance
+  node-authority:
+    name: ${{ matrix.os }} / node22 / authority-v2 conformance
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Read-only conformance
+      - name: Read and authority-v2 conformance
         working-directory: node
         run: npm test
 

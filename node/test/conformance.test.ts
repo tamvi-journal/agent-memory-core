@@ -46,7 +46,7 @@ test("golden manifest authenticates every corpus artifact and normalization tabl
     assert.equal(sha256(path), expected, relative);
   }
   assert.deepEqual(readFileSync(resolve(ROOT, "node", "schema.sql")), readFileSync(resolve(ROOT, "memory_core", "schema.sql")));
-  assert.equal(sha256(resolve(ROOT, "node", "schema.sql")), "6a8444f268105cf8aca74c986232b3578d0d2465bb65a1a2062afa58420a24bd");
+  assert.equal(sha256(resolve(ROOT, "node", "schema.sql")), "a8f283d76ad0966ab82f395583e30849a007814e67eae554e3d967a75918c10c");
   for (const table of ["identity-v1.json", "text-norm-v2.json", "version-sensitive.json"]) {
     assert.deepEqual(readFileSync(resolve(ROOT, "node", "tables", table)), readFileSync(resolve(ROOT, "memory_core", "tables", table)));
   }
@@ -145,7 +145,14 @@ for (const scenario of scenarios) {
       try {
         const actual = expected.result === undefined ? runOrdinary(database, expected) : runSpecial(database, expected);
         const oracle = expected.result === undefined ? clone(expected) : expected.result;
-        if (expected.result === undefined) delete oracle.write_outcomes;
+        if (expected.result === undefined) {
+          delete oracle.write_outcomes;
+          oracle.identity_packet_json.open_core_proposals = [];
+          oracle.status.store = "legacy-v4";
+          oracle.status.write_policy = "self-authored proposals; owner receipt controls canonical core";
+          oracle.status.open_core_proposals = 0;
+        }
+        if (expected.label === "legacy-v3") oracle.message = "schema v3 store must be initialized or migrated to v5 before use";
         assert.deepEqual(actual, oracle);
         assert.deepEqual(readFileSync(database), copyBefore, "read changed the copied store");
         assert.deepEqual(readFileSync(source), sourceBefore, "read changed the checked-in store");
