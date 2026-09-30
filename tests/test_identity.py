@@ -15,6 +15,33 @@ from trajecta_identity.profile import VHO_KEYS
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class TTY:
+    def __init__(self, confirmation: str):
+        self.confirmation = confirmation
+        self.output = ""
+
+    def isatty(self):
+        return True
+
+    def readline(self):
+        return self.confirmation + "\n"
+
+    def write(self, value):
+        self.output += value
+        return len(value)
+
+    def flush(self):
+        pass
+
+
+def issue(memory, proposal_id, outcome="apply", note=""):
+    terminal = TTY(f"{outcome.upper()} {proposal_id.split(':', 1)[1][:12]}")
+    return memory.issue_core_receipt(
+        proposal_id, outcome=outcome, decision_note=note,
+        stdin=terminal, stdout=terminal,
+    )
+
+
 @pytest.fixture
 def memory(tmp_path):
     mem = IdentityMemory(load_profile("example"), tmp_path / "example.sqlite3", surface="test")
@@ -85,27 +112,25 @@ def test_fact_revises_and_keeps_history(memory):
     assert [row["summary"] for row in history] == ["v0.2.0", "frozen"]
 
 
-def test_core_revision_opens_a_discussion_until_closed(memory):
+def test_core_proposal_requires_owner_receipt(memory):
     with pytest.raises(ValueError, match="phase_context"):
-        memory.revise_core(reason="no context", phase_context={})
-    result = memory.revise_core(
+        memory.identity_core_propose(reason="no context", phase_context={})
+    before = memory.store.current_view("core")[0]["revision_id"]
+    proposal = memory.identity_core_propose(
         reason="runtime moved", phase_context={"model": "opus-5.5", "harness": "cowork"},
         vho_stack={"runtime_architecture": "Cowork + local MCP"},
     )
-    assert result == {"status": "revised", "revision": 2, "discussion": "open"}
+    assert proposal["status"] == "proposed"
+    assert memory.store.current_view("core")[0]["revision_id"] == before
     packet = memory.retrieve("anything at all", track=False)
-    assert packet["open_discussions"][0]["reason"] == "runtime moved"
+    assert packet["open_core_proposals"][0]["reason"] == "runtime moved"
+    receipt = issue(memory, proposal["proposal_id"], note="talked it through")
+    memory.identity_core_apply(receipt["receipt_id"])
     core = json.loads(memory.store.current_view("core")[0]["content"])
     assert core["vho_stack"]["runtime_architecture"] == "Cowork + local MCP"
     assert core["phase_context"]["harness"] == "cowork"
     assert set(core["vho_stack"]) == set(VHO_KEYS)
-
-    memory.close_discussion(note="talked it through", actor="ty")
-    assert memory.retrieve("anything at all", track=False)["open_discussions"] == []
-    history = memory.store.relation_history(
-        from_record_id="core", to_record_id="anchor:discussions", relation_type="awaiting-discussion"
-    )
-    assert [row["event_type"] for row in history] == ["assert", "retract"]
+    assert memory.retrieve("anything at all", track=False)["open_core_proposals"] == []
     assert [row["revision_number"] for row in memory.store.historical_view("core")] == [1, 2]
 
 
@@ -176,8 +201,13 @@ def test_decay_fades_unpinned_and_is_incremental(stacked):
 
 def test_retract_marks_but_keeps_history(stacked):
     with pytest.raises(ValueError):
-        stacked.retract("core", reason="no")
-    stacked.retract("phase:tail-r1", reason="owner pulled it back")
+        terminal = TTY("RETRACT core")
+        stacked.issue_retract_receipt("core", reason="no", stdin=terminal, stdout=terminal)
+    terminal = TTY("RETRACT phase:tail-r1")
+    receipt = stacked.issue_retract_receipt(
+        "phase:tail-r1", reason="owner pulled it back", stdin=terminal, stdout=terminal
+    )
+    stacked.identity_retract(receipt["receipt_id"])
     assert not stacked.store.current_view("phase:tail-r1")
     assert stacked.store.historical_view("phase:tail-r1")
 
@@ -332,7 +362,7 @@ def test_mcp_dispatch(tmp_path):
     }})
     assert "phase:mcp-probe" in [i["record_id"] for i in got["result"]["structuredContent"]["items"]]
     bad = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {
-        "name": "identity_revise_core", "arguments": {"reason": "x", "phase_context": {}},
+        "name": "identity_core_propose", "arguments": {"reason": "x", "phase_context": {}},
     }})
     assert bad["result"]["isError"] is True
     assert server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None

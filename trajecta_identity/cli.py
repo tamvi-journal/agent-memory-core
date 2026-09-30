@@ -103,16 +103,30 @@ def parser() -> argparse.ArgumentParser:
     timeline = commands.add_parser("timeline")
     timeline.add_argument("--limit", type=int, default=20)
     commands.add_parser("decay", help="apply time decay (run daily, e.g. from a scheduler)")
-    close = commands.add_parser("close-discussion", help="after talking about a core revision")
+    commands.add_parser("core-proposals", help="list open core proposals and stale state")
+    approve = commands.add_parser("approve-core", help="owner: issue and consume a core decision receipt")
+    approve.add_argument("proposal_id")
+    outcome = approve.add_mutually_exclusive_group(required=True)
+    outcome.add_argument("--apply", action="store_true")
+    outcome.add_argument("--reject", action="store_true")
+    approve.add_argument("--note", default="")
+    approve.add_argument("--issue-only", action="store_true")
+    approve_retract = commands.add_parser("approve-retract", help="owner: issue and consume a retract receipt")
+    approve_retract.add_argument("record_id")
+    approve_retract.add_argument("--reason", required=True)
+    approve_retract.add_argument("--issue-only", action="store_true")
+    close = commands.add_parser("close-legacy-discussion", help="owner: close a migrated v4 discussion")
     close.add_argument("--note", required=True)
-    close.add_argument("--actor", default="ty")
+    close.add_argument("--issue-only", action="store_true")
+    apply_receipt = commands.add_parser("apply-receipt", help="consume an existing owner receipt")
+    apply_receipt.add_argument("receipt_id")
     loop = commands.add_parser("close-loop")
     loop.add_argument("record_id")
     loop.add_argument("--note", required=True)
-    retract = commands.add_parser("retract", help="owner: mark a phase/fact invalidated (never deletes)")
-    retract.add_argument("record_id")
-    retract.add_argument("--reason", required=True)
-    retract.add_argument("--actor", default="ty")
+    migrate = commands.add_parser("migrate-to", help="migrate only a copy of a legacy store")
+    migrate.add_argument("target", type=Path)
+    migrate.add_argument("--dry-run", action="store_true")
+    migrate.add_argument("--backup", type=Path)
     aml = commands.add_parser("import-aml", help="import an AML vault (read-only)")
     aml.add_argument("path", type=Path)
     return root
@@ -138,8 +152,6 @@ def main(argv: list[str] | None = None) -> None:
         return
     profile = resolve(args.profile)
     memory = IdentityMemory(profile, args.db, surface="cli")
-    if command != "init":
-        memory.bootstrap()  # idempotent; a fresh machine works without a separate init
     if command == "init":
         result = memory.bootstrap()
     elif command == "work":
@@ -176,6 +188,7 @@ def main(argv: list[str] | None = None) -> None:
             sys.stdout.write(result["packet"])
             return
     elif command == "log-phase":
+        memory.bootstrap()
         result = memory.log_phase(
             args.event_id,
             title=args.title,
@@ -188,6 +201,7 @@ def main(argv: list[str] | None = None) -> None:
             source_ref=args.source,
         )
     elif command == "log-fact":
+        memory.bootstrap()
         result = memory.log_fact(
             args.fact_id, title=args.title, summary=args.summary,
             content=args.content, source_ref=args.source,
@@ -195,14 +209,56 @@ def main(argv: list[str] | None = None) -> None:
     elif command == "timeline":
         result = {"timeline": memory.timeline(args.limit)}
     elif command == "decay":
+        memory.bootstrap()
         result = memory.decay()
-    elif command == "close-discussion":
-        result = memory.close_discussion(note=args.note, actor=args.actor)
+    elif command == "core-proposals":
+        result = {"open_core_proposals": memory.open_core_proposals()}
+    elif command == "approve-core":
+        receipt = memory.issue_core_receipt(
+            args.proposal_id,
+            outcome="apply" if args.apply else "reject",
+            decision_note=args.note,
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+        )
+        if args.issue_only:
+            result = {"receipt_id": receipt["receipt_id"], "status": "issued"}
+        else:
+            try:
+                result = memory.identity_core_apply(receipt["receipt_id"])
+            except Exception as exc:
+                print(receipt["receipt_id"], file=sys.stderr)
+                raise SystemExit(f"{type(exc).__name__}: {exc}") from exc
+    elif command == "approve-retract":
+        receipt = memory.issue_retract_receipt(
+            args.record_id, reason=args.reason, stdin=sys.stdin, stdout=sys.stdout
+        )
+        result = (
+            {"receipt_id": receipt["receipt_id"], "status": "issued"}
+            if args.issue_only
+            else memory.identity_retract(receipt["receipt_id"])
+        )
+    elif command == "close-legacy-discussion":
+        receipt = memory.issue_legacy_close_receipt(
+            note=args.note, stdin=sys.stdin, stdout=sys.stdout
+        )
+        result = (
+            {"receipt_id": receipt["receipt_id"], "status": "issued"}
+            if args.issue_only
+            else memory.identity_close_legacy_discussion(receipt["receipt_id"])
+        )
+    elif command == "apply-receipt":
+        result = memory.apply_receipt(args.receipt_id)
     elif command == "close-loop":
+        memory.bootstrap()
         result = memory.close_loop(args.record_id, note=args.note)
-    elif command == "retract":
-        result = memory.retract(args.record_id, reason=args.reason, actor=args.actor)
+    elif command == "migrate-to":
+        migrated = memory.store.migrate_to(
+            args.target, dry_run=args.dry_run, backup_path=args.backup
+        )
+        result = migrated if isinstance(migrated, dict) else migrated.schema_info()
     elif command == "import-aml":
+        memory.bootstrap()
         from .migrate_aml import import_aml
 
         result = import_aml(memory, args.path)

@@ -25,8 +25,18 @@ from memory_core import (
     PacketRenderer,
     vho_open_seed,
 )
+from memory_core.store import hash_payload, utc_now
 
 from .activation import ActivationPolicy, apply_recall, run_decay, state_of
+from .authority import (
+    ProposalDecided,
+    ProposalIntegrityError,
+    ReceiptIntegrityError,
+    ReceiptNotFound,
+    StaleAuthority,
+    require_confirmation,
+    short_id,
+)
 from .paths import profile_db
 from .work import WorkStore, refs_in
 from .profile import (
@@ -97,6 +107,7 @@ class IdentityMemory:
             profile.memory_profile(),
             surface=surface,
             governance=SELF_AUTHORED_POLICY,
+            pinned_guard=PINNED,
         )
         self.store = self.runtime.store
         self.work = WorkStore.from_config(profile.extra)
@@ -108,6 +119,10 @@ class IdentityMemory:
 
         self.store.initialize()
         results = {}
+        with self.store._bootstrap_writes():
+            return self._bootstrap_in(results)
+
+    def _bootstrap_in(self, results: dict[str, Any]) -> dict[str, Any]:
         for anchor, title in (
             (DISCUSSION_ANCHOR, "Open core discussions"),
             (OPEN_LOOP_ANCHOR, "Open loops"),
@@ -276,7 +291,7 @@ class IdentityMemory:
             status = "revised" if exists else "created"
         return {"record_id": record_id, "status": status}
 
-    def revise_core(
+    def identity_core_propose(
         self,
         *,
         reason: str,
@@ -288,76 +303,571 @@ class IdentityMemory:
         falsifier: str | None = None,
         source_ref: str = "",
     ) -> dict[str, Any]:
-        """Revise the core. Allowed, but it opens a discussion with the owner.
-
-        ``phase_context`` is required: it records model, harness and the
-        policies in force, so a later phase can tell the agent from the policy
-        that was pressing on it.
-        """
+        """Append a proposal; never mutate the canonical core."""
 
         if not str(reason).strip():
-            raise ValueError("a core revision needs a reason")
+            raise ValueError("a core proposal needs a reason")
         if not isinstance(phase_context, dict) or not phase_context:
-            raise ValueError("a core revision needs phase_context (model, harness, policies)")
-        current = self.store.current_view(CORE_ID)
-        if not current:
-            raise ValueError("core is not bootstrapped")
-        old = json.loads(current[0]["content"])
-        merged = {
-            "title": title or current[0]["title"],
-            "summary": summary or current[0]["summary"],
-            "vho_stack": {**old["vho_stack"], **(vho_stack or {})},
-            "recognition_signature": recognition_signature or old["recognition_signature"],
-            "falsifier": falsifier or old["falsifier"],
-            "phase_context": phase_context,
-        }
-        errors = validate_core(merged)
-        if errors:
-            raise ValueError("; ".join(errors))
-        intake = self.runtime.submit(
-            operation_type="refine",
-            record_id=CORE_ID,
-            actor=self.profile.agent,
-            reason=reason,
-            logic="the agent re-read its own self-location",
-            truth_basis="phase context and source are attached",
-            falsifier=merged["falsifier"],
-            evidence=[self._self_evidence(source_ref or f"self:core:{_now()}", reason)],
-            idempotency_key=f"{self.profile.name}:core:{_digest(core_content(merged), reason)}",
-            changes={
+            raise ValueError("a core proposal needs phase_context (model, harness, policies)")
+        with self.store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute(
+                "SELECT * FROM memory_current_v3 WHERE record_id='core'"
+            ).fetchone()
+            if not current:
+                raise ValueError("core is not bootstrapped")
+            old = json.loads(current["content"])
+            merged = {
+                "title": title or current["title"],
+                "summary": summary or current["summary"],
+                "vho_stack": {**old["vho_stack"], **(vho_stack or {})},
+                "recognition_signature": recognition_signature or old["recognition_signature"],
+                "falsifier": falsifier or old["falsifier"],
+                "phase_context": phase_context,
+            }
+            errors = validate_core(merged)
+            if errors:
+                raise ValueError("; ".join(errors))
+            content = core_content(merged)
+            phase_context_json = json.dumps(
+                phase_context, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            content_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            phase_context_sha256 = hash_payload(phase_context)
+            reason_sha256 = hashlib.sha256(reason.encode("utf-8")).hexdigest()
+            proposal_fields = {
+                "profile": self.profile.name,
+                "record_id": CORE_ID,
+                "base_core_revision_id": current["revision_id"],
                 "title": merged["title"],
                 "summary": merged["summary"],
-                "content": core_content(merged),
-            },
-        )
-        if intake["status"] != "materialized":
-            return {"status": intake["status"], "reason": intake["decision_reason"]}
-        revision = self.store.current_view(CORE_ID)[0]
-        self.store.add_relation(
-            relation_id=f"{self.profile.name}:core-discussion",
-            from_record_id=CORE_ID,
-            to_record_id=DISCUSSION_ANCHOR,
-            relation_type="awaiting-discussion",
-            source_revision_id=revision["revision_id"],
-            actor=self.profile.agent,
-            surface=self.surface,
-            reason=reason,
-        )
-        return {
-            "status": "revised",
-            "revision": revision["revision_number"],
-            "discussion": "open",
-        }
+                "content_sha256": content_sha256,
+                "phase_context_sha256": phase_context_sha256,
+                "reason_sha256": reason_sha256,
+            }
+            proposal_source = source_ref or (
+                "self:core-proposal:" + hashlib.sha256(
+                    hash_payload(proposal_fields).encode("utf-8")
+                ).hexdigest()[:32]
+            )
+            proposal_sha256 = hash_payload(
+                {**proposal_fields, "source_ref": proposal_source}
+            )
+            proposal_id = "core-proposal:" + proposal_sha256[:32]
+            existing = conn.execute(
+                "SELECT * FROM memory_core_proposals_v5 WHERE proposal_sha256=?",
+                (proposal_sha256,),
+            ).fetchone()
+            if existing:
+                return {**dict(existing), "status": "existing"}
+            conn.execute(
+                "INSERT INTO memory_core_proposals_v5("
+                "proposal_id,profile,record_id,base_core_revision_id,title,summary,"
+                "content,content_sha256,phase_context_json,phase_context_sha256,"
+                "reason,reason_sha256,source_ref,proposal_sha256,created_at,created_by,surface"
+                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    proposal_id, self.profile.name, CORE_ID,
+                    current["revision_id"], merged["title"], merged["summary"],
+                    content, content_sha256, phase_context_json,
+                    phase_context_sha256, reason, reason_sha256, proposal_source,
+                    proposal_sha256, utc_now(), self.profile.agent, self.surface,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM memory_core_proposals_v5 WHERE proposal_id=?",
+                (proposal_id,),
+            ).fetchone()
+            return {**dict(row), "status": "proposed"}
 
-    def close_discussion(self, *, note: str, actor: str) -> dict[str, Any]:
-        return self.store.retract_relation(
-            from_record_id=CORE_ID,
-            to_record_id=DISCUSSION_ANCHOR,
-            relation_type="awaiting-discussion",
-            actor=actor,
-            reason=note,
-            surface=self.surface,
+    def open_core_proposals(self) -> list[dict[str, Any]]:
+        info = self.store.schema_info()
+        if info["state"] == "legacy-v4":
+            return []
+        if info["state"] != "ready":
+            return []
+        current = self.store.current_view(CORE_ID)
+        current_id = current[0]["revision_id"] if current else None
+        with self.store.connect(readonly=True) as conn:
+            rows = conn.execute(
+                "SELECT * FROM memory_open_core_proposals_v5 "
+                "WHERE profile=? ORDER BY created_at,proposal_id",
+                (self.profile.name,),
+            ).fetchall()
+        return [
+            {
+                "proposal_id": row["proposal_id"],
+                "base_core_revision_id": row["base_core_revision_id"],
+                "stale": row["base_core_revision_id"] != current_id,
+                "created_at": row["created_at"],
+                "created_by": row["created_by"],
+                "reason": row["reason"],
+                "title": row["title"],
+            }
+            for row in rows
+        ]
+
+    def _issue_receipt(self, purpose: str, binding: dict[str, Any]) -> dict[str, Any]:
+        binding_json = json.dumps(
+            binding, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )
+        binding_sha256 = hash_payload(binding)
+        receipt_id = "receipt:" + binding_sha256[:32]
+        with self.store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "INSERT INTO memory_owner_receipts_v5("
+                "receipt_id,purpose,profile,binding_json,binding_sha256,issued_at,"
+                "issued_by,authority,guard) VALUES(?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(binding_sha256) DO NOTHING",
+                (
+                    receipt_id, purpose, self.profile.name, binding_json,
+                    binding_sha256, utc_now(), self.profile.owner, "owner",
+                    "tty-human-presence/v1",
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM memory_owner_receipts_v5 WHERE binding_sha256=?",
+                (binding_sha256,),
+            ).fetchone()
+        return dict(row)
+
+    def issue_core_receipt(
+        self,
+        proposal_id: str,
+        *,
+        outcome: str,
+        decision_note: str = "",
+        stdin,
+        stdout,
+    ) -> dict[str, Any]:
+        if outcome not in {"apply", "reject"}:
+            raise ValueError("outcome must be apply or reject")
+        with self.store.connect(readonly=True) as conn:
+            proposal = conn.execute(
+                "SELECT * FROM memory_core_proposals_v5 WHERE proposal_id=? AND profile=?",
+                (proposal_id, self.profile.name),
+            ).fetchone()
+            if not proposal:
+                raise ProposalIntegrityError("proposal not found")
+            if conn.execute(
+                "SELECT 1 FROM memory_proposal_decisions_v5 WHERE proposal_id=?",
+                (proposal_id,),
+            ).fetchone():
+                raise ProposalDecided("proposal is already decided")
+            current = conn.execute(
+                "SELECT revision_id FROM memory_current_v3 WHERE record_id='core'"
+            ).fetchone()
+        if not current:
+            raise ProposalIntegrityError("core is not bootstrapped")
+        if outcome == "apply" and proposal["base_core_revision_id"] != current["revision_id"]:
+            raise StaleAuthority("stale proposal cannot be issued an apply receipt")
+        expected = f"{outcome.upper()} {short_id(proposal_id)}"
+        require_confirmation(expected, stdin=stdin, stdout=stdout)
+        binding = {
+            "purpose": "identity_core_revision",
+            "profile": self.profile.name,
+            "current_core_revision_id": current["revision_id"],
+            "proposal_id": proposal_id,
+            "proposal_sha256": proposal["proposal_sha256"],
+            "content_sha256": proposal["content_sha256"],
+            "phase_context_sha256": proposal["phase_context_sha256"],
+            "reason_sha256": proposal["reason_sha256"],
+            "source_ref": proposal["source_ref"],
+            "outcome": outcome,
+            "decision_note": decision_note,
+            "authority": "owner",
+        }
+        return self._issue_receipt("identity_core_revision", binding)
+
+    def issue_retract_receipt(
+        self, record_id: str, *, reason: str, stdin, stdout
+    ) -> dict[str, Any]:
+        if record_id in PINNED:
+            raise ValueError("core, ontology and anchors cannot be retracted")
+        current = self.store.current_view(record_id)
+        if not current:
+            raise ValueError("current record not found")
+        require_confirmation(
+            f"RETRACT {record_id}", stdin=stdin, stdout=stdout
+        )
+        binding = {
+            "purpose": "identity_retract",
+            "profile": self.profile.name,
+            "record_id": record_id,
+            "current_revision_id": current[0]["revision_id"],
+            "reason": reason,
+            "reason_sha256": hashlib.sha256(reason.encode("utf-8")).hexdigest(),
+            "authority": "owner",
+        }
+        return self._issue_receipt("identity_retract", binding)
+
+    def issue_legacy_close_receipt(self, *, note: str, stdin, stdout) -> dict[str, Any]:
+        current = self.store.current_view(CORE_ID)
+        with self.store.connect(readonly=True) as conn:
+            relation = conn.execute(
+                "SELECT * FROM memory_relation_events_v4 WHERE from_record_id=? "
+                "AND to_record_id=? AND relation_type='awaiting-discussion' "
+                "ORDER BY sequence_number DESC LIMIT 1",
+                (CORE_ID, DISCUSSION_ANCHOR),
+            ).fetchone()
+        if not current or not relation or relation["event_type"] != "assert":
+            raise ValueError("no active legacy core discussion")
+        require_confirmation(
+            f"CLOSE {short_id(relation['relation_event_id'])}",
+            stdin=stdin,
+            stdout=stdout,
+        )
+        binding = {
+            "purpose": "identity_legacy_discussion_close",
+            "profile": self.profile.name,
+            "core_revision_id": current[0]["revision_id"],
+            "relation_event_id": relation["relation_event_id"],
+            "relation_source_revision_id": relation["source_revision_id"],
+            "note": note,
+            "note_sha256": hashlib.sha256(note.encode("utf-8")).hexdigest(),
+            "authority": "owner",
+        }
+        return self._issue_receipt("identity_legacy_discussion_close", binding)
+
+    def _receipt_in(self, conn, receipt_id: str, purpose: str):
+        receipt = conn.execute(
+            "SELECT * FROM memory_owner_receipts_v5 WHERE receipt_id=?", (receipt_id,)
+        ).fetchone()
+        if not receipt:
+            raise ReceiptNotFound(f"unknown receipt {receipt_id}")
+        try:
+            binding = json.loads(receipt["binding_json"])
+        except (TypeError, ValueError) as exc:
+            raise ReceiptIntegrityError("receipt binding_json is invalid") from exc
+        if not isinstance(binding, dict):
+            raise ReceiptIntegrityError("receipt binding must be an object")
+        digest = hash_payload(binding)
+        if digest != receipt["binding_sha256"]:
+            raise ReceiptIntegrityError("receipt binding_sha256 mismatch")
+        if receipt_id != "receipt:" + digest[:32]:
+            raise ReceiptIntegrityError("receipt_id does not match binding")
+        if (
+            receipt["purpose"] != purpose
+            or receipt["profile"] != self.profile.name
+            or receipt["authority"] != "owner"
+            or binding.get("purpose") != receipt["purpose"]
+            or binding.get("profile") != receipt["profile"]
+            or binding.get("authority") != receipt["authority"]
+        ):
+            raise ReceiptIntegrityError("receipt purpose, profile or authority mismatch")
+        return receipt, binding
+
+    def _replay_in(self, conn, receipt_id: str):
+        consumed = conn.execute(
+            "SELECT operation_id FROM memory_receipt_consumptions_v5 WHERE receipt_id=?",
+            (receipt_id,),
+        ).fetchone()
+        if not consumed:
+            return None
+        operation = conn.execute(
+            "SELECT * FROM memory_operations_v3 WHERE operation_id=?",
+            (consumed["operation_id"],),
+        ).fetchone()
+        if not operation:
+            raise ReceiptIntegrityError("consumption has no authority operation")
+        return self.store._operation_result(conn, operation)
+
+    def _proposal_in(self, conn, binding: dict[str, Any]):
+        proposal = conn.execute(
+            "SELECT * FROM memory_core_proposals_v5 WHERE proposal_id=?",
+            (binding.get("proposal_id"),),
+        ).fetchone()
+        if not proposal:
+            raise ProposalIntegrityError("proposal not found")
+        try:
+            phase_context = json.loads(proposal["phase_context_json"])
+            content_object = json.loads(proposal["content"])
+        except (TypeError, ValueError) as exc:
+            raise ProposalIntegrityError("proposal JSON is invalid") from exc
+        content_digest = hashlib.sha256(proposal["content"].encode("utf-8")).hexdigest()
+        phase_digest = hash_payload(phase_context)
+        reason_digest = hashlib.sha256(proposal["reason"].encode("utf-8")).hexdigest()
+        proposal_fields = {
+            "profile": proposal["profile"],
+            "record_id": proposal["record_id"],
+            "base_core_revision_id": proposal["base_core_revision_id"],
+            "title": proposal["title"],
+            "summary": proposal["summary"],
+            "content_sha256": content_digest,
+            "phase_context_sha256": phase_digest,
+            "reason_sha256": reason_digest,
+            "source_ref": proposal["source_ref"],
+        }
+        proposal_digest = hash_payload(proposal_fields)
+        merged = {
+            "title": proposal["title"],
+            "summary": proposal["summary"],
+            **content_object,
+        } if isinstance(content_object, dict) else {}
+        if not isinstance(content_object, dict):
+            raise ProposalIntegrityError("proposal content must be an object")
+        errors = validate_core(merged)
+        checks = (
+            (content_digest, proposal["content_sha256"], "content_sha256"),
+            (phase_digest, proposal["phase_context_sha256"], "phase_context_sha256"),
+            (reason_digest, proposal["reason_sha256"], "reason_sha256"),
+            (proposal_digest, proposal["proposal_sha256"], "proposal_sha256"),
+            ("core-proposal:" + proposal_digest[:32], proposal["proposal_id"], "proposal_id"),
+        )
+        for actual, expected, label in checks:
+            if actual != expected:
+                raise ProposalIntegrityError(f"proposal {label} mismatch")
+        if errors:
+            raise ProposalIntegrityError("; ".join(errors))
+        if hash_payload(content_object.get("phase_context")) != phase_digest:
+            raise ProposalIntegrityError("phase_context in content does not match proposal")
+        if proposal["profile"] != binding.get("profile"):
+            raise ProposalIntegrityError("proposal profile does not match binding")
+        for key in (
+            "proposal_id", "proposal_sha256", "content_sha256",
+            "phase_context_sha256", "reason_sha256", "source_ref",
+        ):
+            if binding.get(key) != proposal[key]:
+                raise ProposalIntegrityError(f"binding {key} does not match proposal")
+        return proposal
+
+    def identity_core_apply(self, receipt_id: str) -> dict[str, Any]:
+        with self.store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            receipt, binding = self._receipt_in(conn, receipt_id, "identity_core_revision")
+            replay = self._replay_in(conn, receipt_id)
+            if replay is not None:
+                return replay
+            proposal = self._proposal_in(conn, binding)
+            if conn.execute(
+                "SELECT 1 FROM memory_proposal_decisions_v5 WHERE proposal_id=?",
+                (proposal["proposal_id"],),
+            ).fetchone():
+                raise ProposalDecided("proposal is already decided")
+            current = conn.execute(
+                "SELECT * FROM memory_current_v3 WHERE record_id='core'"
+            ).fetchone()
+            if not current or binding.get("current_core_revision_id") != current["revision_id"]:
+                raise StaleAuthority("receipt current core does not match actual current core")
+            outcome = binding.get("outcome")
+            if outcome not in {"apply", "reject"}:
+                raise ReceiptIntegrityError("receipt outcome is invalid")
+            if outcome == "apply" and proposal["base_core_revision_id"] != current["revision_id"]:
+                raise StaleAuthority("proposal base does not match current core")
+            key = "authority-v2:" + receipt_id
+            operation_id = "operation:" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:32]
+            decision_note = str(binding.get("decision_note", ""))
+            revision_id = None
+            evidence_ids: list[str] = []
+            if outcome == "apply":
+                evidence_ids = [
+                    self.store._insert_evidence(conn, {
+                        "evidence_type": "self_log",
+                        "source_ref": proposal["source_ref"],
+                        "content_summary": proposal["reason"][:300],
+                        "confidence": 0.9,
+                        "actor": proposal["created_by"],
+                        "privacy_class": "private",
+                    }),
+                    self.store._insert_evidence(conn, {
+                        "evidence_type": "owner_receipt",
+                        "source_ref": receipt_id,
+                        "content_summary": decision_note or outcome,
+                        "confidence": 1.0,
+                        "actor": receipt["issued_by"],
+                        "privacy_class": "private",
+                    }),
+                ]
+                next_number = int(current["revision_number"]) + 1
+                revision_id = self.store._revision_id(CORE_ID, next_number, key)
+            details = {
+                "receipt_id": receipt_id,
+                "proposal_id": proposal["proposal_id"],
+                "outcome": outcome,
+                "decision_note": decision_note,
+            }
+            if revision_id is not None:
+                details["core_revision_id"] = revision_id
+            operation = self.store._insert_operation(
+                conn,
+                operation_type="identity_core_revision",
+                actor=receipt["issued_by"],
+                surface=self.surface,
+                record_id=CORE_ID,
+                revision_id=None,
+                evidence_ids=evidence_ids,
+                decision="materialized",
+                reason=decision_note or outcome,
+                details=details,
+                idempotency_key=key,
+            )
+            if outcome == "apply":
+                materialized = self.store._revise_in(
+                    conn,
+                    CORE_ID,
+                    actor=receipt["issued_by"],
+                    reason=proposal["reason"],
+                    idempotency_key=key,
+                    changes={
+                        "title": proposal["title"],
+                        "summary": proposal["summary"],
+                        "content": proposal["content"],
+                    },
+                    evidence_ids=evidence_ids,
+                    operation_id=operation_id,
+                    surface=self.surface,
+                )
+                if materialized != revision_id:
+                    raise RuntimeError("authority revision id drift")
+            conn.execute(
+                "INSERT INTO memory_proposal_decisions_v5("
+                "proposal_id,receipt_id,outcome,core_revision_id,decided_at"
+                ") VALUES(?,?,?,?,?)",
+                (
+                    proposal["proposal_id"], receipt_id,
+                    "applied" if outcome == "apply" else "rejected",
+                    revision_id, utc_now(),
+                ),
+            )
+            conn.execute(
+                "INSERT INTO memory_receipt_consumptions_v5(receipt_id,operation_id,consumed_at) "
+                "VALUES(?,?,?)",
+                (receipt_id, operation_id, utc_now()),
+            )
+            return self.store._operation_result(conn, operation)
+
+    def identity_retract(self, receipt_id: str) -> dict[str, Any]:
+        with self.store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            receipt, binding = self._receipt_in(conn, receipt_id, "identity_retract")
+            replay = self._replay_in(conn, receipt_id)
+            if replay is not None:
+                return replay
+            record_id = binding.get("record_id")
+            if record_id in PINNED:
+                raise ReceiptIntegrityError("retract receipt targets a pinned record")
+            current = conn.execute(
+                "SELECT * FROM memory_current_v3 WHERE record_id=?", (record_id,)
+            ).fetchone()
+            if not current or current["revision_id"] != binding.get("current_revision_id"):
+                raise StaleAuthority("retract target revision is stale")
+            reason = binding.get("reason")
+            if not isinstance(reason, str) or hashlib.sha256(reason.encode("utf-8")).hexdigest() != binding.get("reason_sha256"):
+                raise ReceiptIntegrityError("retract reason digest mismatch")
+            key = "authority-v2:" + receipt_id
+            evidence_id = self.store._insert_evidence(conn, {
+                "evidence_type": "owner_receipt",
+                "source_ref": receipt_id,
+                "content_summary": reason,
+                "confidence": 1.0,
+                "actor": receipt["issued_by"],
+                "privacy_class": "private",
+            })
+            operation = self.store._insert_operation(
+                conn,
+                operation_type="identity_retract",
+                actor=receipt["issued_by"],
+                surface=self.surface,
+                record_id=record_id,
+                revision_id=current["revision_id"],
+                evidence_ids=[evidence_id],
+                decision="materialized",
+                reason=reason,
+                details={"receipt_id": receipt_id, "record_id": record_id},
+                idempotency_key=key,
+            )
+            self.store._invalidate_in(
+                conn,
+                record_id,
+                actor=receipt["issued_by"],
+                reason=reason,
+                idempotency_key=key,
+                evidence_ids=[evidence_id],
+                operation_id=operation["operation_id"],
+                surface=self.surface,
+            )
+            conn.execute(
+                "INSERT INTO memory_receipt_consumptions_v5 VALUES(?,?,?)",
+                (receipt_id, operation["operation_id"], utc_now()),
+            )
+            return self.store._operation_result(conn, operation)
+
+    def identity_close_legacy_discussion(self, receipt_id: str) -> dict[str, Any]:
+        with self.store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            receipt, binding = self._receipt_in(
+                conn, receipt_id, "identity_legacy_discussion_close"
+            )
+            replay = self._replay_in(conn, receipt_id)
+            if replay is not None:
+                return replay
+            relation = conn.execute(
+                "SELECT * FROM memory_relation_events_v4 WHERE from_record_id=? "
+                "AND to_record_id=? AND relation_type='awaiting-discussion' "
+                "ORDER BY sequence_number DESC LIMIT 1",
+                (CORE_ID, DISCUSSION_ANCHOR),
+            ).fetchone()
+            current = conn.execute(
+                "SELECT * FROM memory_current_v3 WHERE record_id='core'"
+            ).fetchone()
+            if (
+                not relation
+                or relation["event_type"] != "assert"
+                or relation["relation_event_id"] != binding.get("relation_event_id")
+                or relation["source_revision_id"] != binding.get("relation_source_revision_id")
+                or not current
+                or current["revision_id"] != binding.get("core_revision_id")
+            ):
+                raise StaleAuthority("legacy discussion binding is stale")
+            note = binding.get("note")
+            if not isinstance(note, str) or hashlib.sha256(note.encode("utf-8")).hexdigest() != binding.get("note_sha256"):
+                raise ReceiptIntegrityError("legacy discussion note digest mismatch")
+            key = "authority-v2:" + receipt_id
+            relation_event_id = "relation-event:" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:32]
+            operation = self.store._insert_operation(
+                conn,
+                operation_type="identity_legacy_discussion_close",
+                actor=receipt["issued_by"],
+                surface=self.surface,
+                record_id=CORE_ID,
+                revision_id=current["revision_id"],
+                evidence_ids=[],
+                decision="materialized",
+                reason=note,
+                details={
+                    "receipt_id": receipt_id,
+                    "relation_event_id": relation_event_id,
+                },
+                idempotency_key=key,
+            )
+            self.store._retract_relation_in(
+                conn,
+                latest=relation,
+                actor=receipt["issued_by"],
+                surface=self.surface,
+                reason=note,
+                idempotency_key=key,
+            )
+            conn.execute(
+                "INSERT INTO memory_receipt_consumptions_v5 VALUES(?,?,?)",
+                (receipt_id, operation["operation_id"], utc_now()),
+            )
+            return self.store._operation_result(conn, operation)
+
+    def apply_receipt(self, receipt_id: str) -> dict[str, Any]:
+        with self.store.connect(readonly=True) as conn:
+            receipt = conn.execute(
+                "SELECT purpose FROM memory_owner_receipts_v5 WHERE receipt_id=?",
+                (receipt_id,),
+            ).fetchone()
+        if not receipt:
+            raise ReceiptNotFound(f"unknown receipt {receipt_id}")
+        return {
+            "identity_core_revision": self.identity_core_apply,
+            "identity_retract": self.identity_retract,
+            "identity_legacy_discussion_close": self.identity_close_legacy_discussion,
+        }[receipt["purpose"]](receipt_id)
 
     def close_loop(self, record_id: str, *, note: str, actor: str | None = None) -> dict[str, Any]:
         return self.store.retract_relation(
@@ -368,29 +878,6 @@ class IdentityMemory:
             reason=note,
             surface=self.surface,
         )
-
-    def retract(self, record_id: str, *, reason: str, actor: str = "owner") -> dict[str, Any]:
-        """Owner path: mark a phase or fact invalidated. Nothing is deleted."""
-
-        if record_id in PINNED:
-            raise ValueError("core, ontology and anchors cannot be retracted here")
-        intake = self.runtime.submit(
-            operation_type="invalidate",
-            record_id=record_id,
-            actor=actor,
-            reason=reason,
-            logic="the owner retracted this record",
-            truth_basis="owner instruction",
-            evidence=[{
-                "evidence_type": "owner_statement",
-                "source_ref": f"owner:{actor}",
-                "content_summary": reason,
-                "confidence": 1.0,
-                "actor": actor,
-            }],
-            idempotency_key=f"{self.profile.name}:retract:{record_id}:{_now()}",
-        )
-        return {"record_id": record_id, "status": intake["status"]}
 
     # ------------------------------------------------------------------- read
 
@@ -453,6 +940,7 @@ class IdentityMemory:
             "profile": self.profile.name,
             "cue": cue,
             "memory_decides_truth": False,
+            "open_core_proposals": self.open_core_proposals(),
             "open_discussions": self.open_discussions(),
             "open_loops": self.open_loops(),
             "causal_neighbors": self._causal_neighbors([item["record_id"] for item in items]),
@@ -504,7 +992,7 @@ class IdentityMemory:
 
     def status(self) -> dict[str, Any]:
         info = self.store.schema_info()
-        rows = self.store.current_view() if info["state"] == "ready" else []
+        rows = self.store.current_view() if info["state"] in {"ready", "legacy-v4"} else []
         states: dict[str, int] = {}
         domains: dict[str, int] = {}
         for row in rows:
@@ -518,10 +1006,11 @@ class IdentityMemory:
             "agent": self.profile.agent,
             "db": str(self.db_path),
             "store": info["state"],
-            "write_policy": "self-authored: phase append-only, fact revisable, core revisable + discuss",
+            "write_policy": "self-authored proposals; owner receipt controls canonical core",
             "records": domains,
             "activation": states,
             "open_discussions": len(self.open_discussions()) if rows else 0,
+            "open_core_proposals": len(self.open_core_proposals()) if rows else 0,
             "open_loops": len(self.open_loops()) if rows else 0,
             "work_store": str(self.work.root) if self.work else None,
         }
