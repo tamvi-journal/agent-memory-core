@@ -48,7 +48,12 @@ WRITABLE_SCHEMA_VERSION  = 5
   - the missing v5 tables are never queried.
 - **A new runtime always emits `open_core_proposals`,** as `[]` on v4, so there is one output shape.
 - A v4-only runtime may refuse a v5 store. That is expected.
-- **The R0/R1 read corpus is v4.** It stays valid and must keep passing under v5 readers, unchanged.
+- **The R0/R1 read corpus is v4.** Its files stay unchanged, and it must keep passing under v5 readers by the **additive-field rule**:
+  - the runner first asserts each new field's v4 value: packet `open_core_proposals == []`, status `open_core_proposals == 0`;
+  - it then removes exactly those new keys and compares everything else byte for byte against the frozen expected output;
+  - the rendered packet text does not change when there are no proposals (no empty section is rendered), so `packet_text` is compared unmodified.
+
+  Any other difference fails. The frozen R0 corpus is never regenerated for R2a.
 
 ### 2.2 Tables
 
@@ -220,7 +225,7 @@ trajecta-identity apply-receipt <receipt_id>                       # consume an 
    - Load the receipt.
    - Check that its purpose is `identity_core_revision` and that it is for this profile.
    - Parse `binding_json` losslessly, recompute `hash_payload`, and require it to equal the stored `binding_sha256`, and `receipt_id` to equal `"receipt:" + binding_sha256[:32]`.
-   - Require the binding's purpose, profile and authority to equal the receipt row's.
+   - Require the binding's purpose, profile and authority to equal the receipt row's, and the profile to equal the runtime's profile.
 2. **Replay.** If the receipt is already consumed, load its authority operation (F1) and return the stored result. This happens only after step 1, so a tampered receipt never replays.
 3. **Proposal integrity (F2).** Load the proposal named by the binding and recompute everything from the stored bytes:
    - `sha256(utf8(content))` must equal `content_sha256`;
@@ -230,7 +235,8 @@ trajecta-identity apply-receipt <receipt_id>                       # consume an 
    - `proposal_id` must equal `"core-proposal:" + proposal_sha256[:32]`;
    - parse `content` losslessly as `core_content`, and require it to pass `validate_core`;
    - its `phase_context` must hash to `phase_context_sha256` (the consistency invariant);
-   - every recomputed digest, and `proposal_id`, must equal the binding.
+   - every recomputed digest, and `proposal_id`, must equal the binding;
+   - `proposal.profile` must equal `binding.profile`, which equals the receipt's and the runtime's profile. Recomputing `proposal_sha256` only proves the proposal's own profile, so this equality is checked separately. Otherwise a receipt for profile A could settle a proposal for profile B on a shared store.
 4. **Open.** The proposal must have no decision.
 5. **Current core (F3).** Let `actual` be the current core `revision_id`.
    - Always, `binding.current_core_revision_id == actual`.
@@ -262,7 +268,8 @@ The shape is the same: step 1, then step 2 (replay), then:
 - the target must be a non-pinned record, and its current `revision_id` must equal `binding.current_revision_id`;
 - `sha256(binding.reason)` must equal `reason_sha256`;
 - one authority operation is created (`operation_type = "identity_retract"`, the same key rule);
-- `_invalidate_in(conn, …)` runs, bound to that operation;
+- the retract binding's profile, the receipt's and the runtime's profile must be equal;
+- `_invalidate_in(conn, …)` runs, bound to that operation through the same key;
 - the receipt is consumed.
 
 ### 4.5 `identity_close_legacy_discussion(receipt_id)`
@@ -274,7 +281,7 @@ The shape is again the same: step 1, then step 2, then:
 - the current core must equal `binding.core_revision_id`;
 - `sha256(binding.note)` must equal `note_sha256`;
 - one authority operation is created (`operation_type = "identity_legacy_discussion_close"`);
-- `_retract_relation_in(conn, …)` appends the retract event. Its details reference the authority operation, so the relation event helper does not create a second operation;
+- `_retract_relation_in(conn, …)` appends the retract event with `idempotency_key = "authority-v2:" + receipt_id`. That is the same key as the authority operation, and the link is representable in the unchanged v4 `memory_relation_events_v4` columns. The relation helper creates no operation of its own;
 - the receipt is consumed.
 
 ### 4.6 No bypass below MCP (A6, F6)
@@ -332,7 +339,7 @@ The shape is again the same: step 1, then step 2, then:
 - Receipt integrity:
   - an unknown receipt;
   - the wrong purpose;
-  - the wrong profile;
+  - the wrong profile, including a receipt for profile A that names a proposal of profile B on a shared store;
   - `binding_json` edited while `binding_sha256` stays unchanged;
   - `binding_sha256` edited.
 - Proposal integrity:
