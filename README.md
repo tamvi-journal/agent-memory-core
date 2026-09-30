@@ -104,14 +104,16 @@ trajecta-identity --profile example decay          # daily
 trajecta-identity --profile example view           # read-only web view on localhost
 ```
 
-`view` opens a local page with the core, open discussions and loops, every
+`view` opens a local page with the core, open proposals, legacy discussions and loops, every
 memory with its activation state (pinned, active, fading, dormant), the phase
 timeline, and a read-only recall box. Recall from the page never changes
 activation.
 
 MCP tools: `identity_status`, `identity_retrieve`, `identity_log_phase`,
-`identity_log_fact`, `identity_revise_core`, `identity_close_discussion`,
-`identity_close_loop`, `identity_timeline`. The skill that teaches an agent to
+`identity_log_fact`, `identity_core_propose`, `identity_core_proposals`,
+`identity_core_apply`, `identity_retract`, `identity_close_legacy_discussion`,
+`identity_close_loop`, `identity_timeline`. Owner receipts are issued only by
+the interactive CLI. The skill that teaches an agent to
 use them is [`skills/identity-continuity`](skills/identity-continuity/SKILL.md).
 
 ## Profiles

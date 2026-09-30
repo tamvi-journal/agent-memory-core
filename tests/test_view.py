@@ -11,13 +11,28 @@ from trajecta_identity import IdentityMemory, load_profile
 from trajecta_identity.view import make_handler, serve, snapshot
 
 
+class TTY:
+    def __init__(self, value):
+        self.value = value
+    def isatty(self): return True
+    def readline(self): return self.value + "\n"
+    def write(self, value): return len(value)
+    def flush(self): pass
+
+
 @pytest.fixture
 def memory(tmp_path):
     mem = IdentityMemory(load_profile("example"), tmp_path / "m.sqlite3", surface="test")
     mem.bootstrap()
     mem.log_phase("one", title="First phase", summary="Started", cues=["first light"])
     mem.log_phase("two", title="Second phase", summary="Grew", follows=["phase:one"], open_loop=True)
-    mem.revise_core(reason="runtime moved", phase_context={"model": "m2"})
+    proposal = mem.identity_core_propose(reason="runtime moved", phase_context={"model": "m2"})
+    terminal = TTY("APPLY " + proposal["proposal_id"].split(":", 1)[1][:12])
+    receipt = mem.issue_core_receipt(
+        proposal["proposal_id"], outcome="apply", stdin=terminal, stdout=terminal
+    )
+    mem.identity_core_apply(receipt["receipt_id"])
+    mem.identity_core_propose(reason="next reading", phase_context={"model": "m3"})
     return mem
 
 
@@ -33,7 +48,7 @@ def test_snapshot_has_core_nodes_timeline_and_alerts(memory):
     assert {n["record_id"] for n in snap["nodes"]} >= {"core", "phase:one", "phase:two"}
     assert not any(n["record_id"].startswith("anchor:") for n in snap["nodes"])
     assert [t["record_id"] for t in snap["timeline"]][:2] == ["phase:two", "phase:one"] or len(snap["timeline"]) == 2
-    assert snap["open_discussions"] and snap["open_loops"]
+    assert snap["open_core_proposals"] and snap["open_loops"]
     assert {"from": "phase:two", "type": "later-phase-of", "to": "phase:one"} in snap["relations"]
 
 

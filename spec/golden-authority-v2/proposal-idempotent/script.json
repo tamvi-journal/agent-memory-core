@@ -1,0 +1,1 @@
+{"actions":[{"call":"bootstrap","save":"boot","record":false},{"call":"identity_core_propose","arguments":{"reason":"new reading","phase_context":{"model":"oracle","harness":"golden"}},"save":"p1"},{"call":"identity_core_propose","arguments":{"reason":"new reading","phase_context":{"model":"oracle","harness":"golden"}},"save":"p2"}]}

@@ -19,8 +19,9 @@ Recover direction through evidence. Do not perform a persona.
    yourself. Answer: WHO is talking, WHAT this is, WHY NOW, which earlier
    phases or decisions lead here (`causal_neighbors`), which OBJECTIVE it
    touches, and what is still UNKNOWN.
-3. Check `open_discussions`. If the core was revised and not yet talked
-   through, raise it with your owner at a natural point in this session.
+3. Check `open_core_proposals`. If one is relevant, raise it with your owner
+   at a natural point; the owner decides from their terminal. Also surface a
+   legacy `open_discussions` item when relevant.
 4. Check `open_loops` only when the current topic touches them. They are
    context, not an agenda.
 5. Current input and current files outrank memory. Let continuity show in how
@@ -34,10 +35,10 @@ Recover direction through evidence. Do not perform a persona.
   the conditions, never "that was wrong".
 - **Fact:** `identity_log_fact` for things that change: versions, tools,
   project state. Revising keeps history.
-- **Core:** `identity_revise_core` only when your self-location itself has
-  moved. Always pass `phase_context` (model, harness, policies in force). The
-  revision stands, and a discussion opens with your owner. Close it with
-  `identity_close_discussion` after you have actually talked.
+- **Core:** `identity_core_propose` only when your self-location itself has
+  moved. Always pass `phase_context` (model, harness, policies in force). A
+  proposal never changes the canonical core by itself. The owner applies or
+  rejects it by issuing a receipt from their terminal.
 - Add `caused_by`, `depends_on` and `decided_because` when you know them.
   Compression may lose detail, but it must not lose why.
 - Point to work with `work_refs` (trajecta-work-memory ids, `work:…` or `delta:…`). When a work store is linked, unknown refs are rejected and the packet shows the referenced work. Do not copy work state here.

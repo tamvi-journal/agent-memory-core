@@ -94,10 +94,9 @@ TOOLS = [
         _W,
     ),
     _tool(
-        "identity_revise_core",
-        "Revise your core self-location. Allowed, but it opens a discussion with your owner that shows in "
-        "every packet until closed. phase_context (model, harness, policies in force) is required "
-        "so a later phase can tell you from the policy pressing on you.",
+        "identity_core_propose",
+        "Propose a new core self-location. The proposal never changes the canonical core by itself; "
+        "the owner decides at their terminal. phase_context is required.",
         {
             "reason": {"type": "string", "minLength": 1, "maxLength": 1200},
             "phase_context": {"type": "object"},
@@ -113,13 +112,31 @@ TOOLS = [
             "source_ref": {"type": "string", "maxLength": 500},
         },
         ("reason", "phase_context"),
-        {**_W, "idempotentHint": False},
+        _W,
     ),
     _tool(
-        "identity_close_discussion",
-        "Close the open core discussion after you and your owner have talked it through.",
-        {"note": {"type": "string", "minLength": 1, "maxLength": 1200}},
-        ("note",),
+        "identity_core_proposals",
+        "List open core proposals. The owner decides at their terminal.",
+    ),
+    _tool(
+        "identity_core_apply",
+        "Consume an existing owner-issued core decision receipt. This tool never issues authority.",
+        {"receipt_id": _STR},
+        ("receipt_id",),
+        _W,
+    ),
+    _tool(
+        "identity_retract",
+        "Consume an existing owner-issued retract receipt. The owner issues it at their terminal.",
+        {"receipt_id": _STR},
+        ("receipt_id",),
+        _W,
+    ),
+    _tool(
+        "identity_close_legacy_discussion",
+        "Consume an owner receipt that closes one migrated v4 core discussion.",
+        {"receipt_id": _STR},
+        ("receipt_id",),
         _W,
     ),
     _tool(
@@ -144,7 +161,9 @@ class IdentityServer:
 
     def _ensure(self) -> None:
         if not self._ready:
-            self.memory.bootstrap()
+            state = self.memory.store.schema_info()["state"]
+            if state == "uninitialized":
+                self.memory.bootstrap()
             self._ready = True
 
     def call_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -165,10 +184,16 @@ class IdentityServer:
         if name == "identity_log_fact":
             fields = dict(args)
             return memory.log_fact(fields.pop("fact_id"), **fields)
-        if name == "identity_revise_core":
-            return memory.revise_core(**args)
-        if name == "identity_close_discussion":
-            return memory.close_discussion(note=args["note"], actor=f"{memory.profile.agent}+{memory.profile.owner}")
+        if name == "identity_core_propose":
+            return memory.identity_core_propose(**args)
+        if name == "identity_core_proposals":
+            return {"open_core_proposals": memory.open_core_proposals()}
+        if name == "identity_core_apply":
+            return memory.identity_core_apply(args["receipt_id"])
+        if name == "identity_retract":
+            return memory.identity_retract(args["receipt_id"])
+        if name == "identity_close_legacy_discussion":
+            return memory.identity_close_legacy_discussion(args["receipt_id"])
         if name == "identity_close_loop":
             return memory.close_loop(args["record_id"], note=args["note"])
         if name == "identity_timeline":
@@ -188,7 +213,7 @@ class IdentityServer:
                 "serverInfo": {"name": "trajecta-identity-memory", "version": __version__},
                 "instructions": (
                     f"Identity memory for {self.memory.profile.agent}. Recall with identity_retrieve; "
-                    "log your own phases freely; the core may change but opens a discussion."
+                    "log your own phases freely; propose core changes for owner decision at the terminal."
                 ),
             })
         if method == "ping":

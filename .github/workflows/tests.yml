@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  node-readonly:
-    name: ${{ matrix.os }} / node22 / read-only conformance
+  node-authority:
+    name: ${{ matrix.os }} / node22 / authority-v2 conformance
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Read-only conformance
+      - name: Read and authority-v2 conformance
         working-directory: node
         run: npm test
 
@@ -59,12 +59,20 @@ jobs:
       - name: Install and test Unicode 14 tables
         run: |
           python -m pip install -e ".[test]"
-          python -m pytest -q tests/test_r0b_oracle.py tests/test_title_table.py
-      - name: Regenerate under three hash seeds
+          python -m pytest -q tests/test_r0b_oracle.py tests/test_title_table.py tests/test_authority_corpus.py tests/test_r0_corpus_on_v5.py tests/test_v4_read_surfaces.py tests/test_cli_inline_consume.py
+
+  authority-corpus:
+    name: ubuntu / py3.11 / authority-v2 corpus
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate authority-v2 under three hash seeds
         run: |
           set -eu
           for seed in 0 1 4294967295; do
-            output="$(mktemp -d)/golden"
-            PYTHONHASHSEED="$seed" python tools/golden/generate.py --output "$output"
-            diff -qr spec/golden "$output"
+            output="$(mktemp -d)/golden-authority-v2"
+            PYTHONHASHSEED="$seed" python tools/golden_authority/generate.py --output "$output"
+            diff -qr spec/golden-authority-v2 "$output"
           done

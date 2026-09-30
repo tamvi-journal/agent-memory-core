@@ -1,0 +1,1 @@
+{"actions":[{"call":"install_legacy_v4","source":"spec/golden/identity-open/store.sqlite3","record":false},{"call":"fixture_log_phase","arguments":{"event_id":"blocked","title":"blocked","summary":"blocked"},"expect_error":"MigrationRequiredError"}]}

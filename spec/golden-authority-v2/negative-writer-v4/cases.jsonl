@@ -1,0 +1,1 @@
+{"label":"negative-writer-v4","results":[{"call":"fixture_log_phase","index":1,"result":{"error":"MigrationRequiredError","message":"schema v4 store must be migrated to v5 before writing","no_operation":true,"store_bytes_unchanged":true}}]}

@@ -26,8 +26,9 @@ class MemoryRuntime:
         *,
         surface: str = "local",
         governance: GovernancePolicy | None = None,
+        pinned_guard: tuple[str, ...] = (),
     ):
-        self.store = MemoryStore(db_path)
+        self.store = MemoryStore(db_path, pinned_guard=pinned_guard)
         self.profile = profile
         self.surface = surface
         self.intake = ValidatedIntake(

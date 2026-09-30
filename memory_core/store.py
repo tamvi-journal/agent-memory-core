@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import sqlite3
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -14,7 +16,10 @@ from .text import normalize_identity_v1, normalize_text
 
 
 APPLICATION_ID = 0x414D4333  # "AMC3"
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
+READABLE_SCHEMA_VERSIONS = frozenset({4, 5})
+WRITABLE_SCHEMA_VERSION = 5
+LEGACY_V4_VERSION = 4
 LEGACY_V3_VERSION = 3
 EVIDENCE_IDENTITY_VERSION = "evidence-v2"
 
@@ -29,6 +34,10 @@ class MigrationRequiredError(SchemaVersionError):
 
 class IncompatibleJournalMode(SchemaVersionError):
     """The store must be explicitly repaired before a read can continue."""
+
+
+class PinnedRecordError(ValueError):
+    """A public identity writer attempted to mutate a structural record."""
 
 
 def utc_now() -> str:
@@ -112,8 +121,29 @@ def canonical_evidence_identity(
 
 
 class MemoryStore:
-    def __init__(self, db_path: str | Path):
+    def __init__(
+        self,
+        db_path: str | Path,
+        *,
+        pinned_guard: tuple[str, ...] = (),
+    ):
         self.db_path = Path(db_path)
+        self.pinned_guard = frozenset(pinned_guard)
+        self._bootstrap_depth = 0
+
+    def _guard_pinned(self, record_id: str) -> None:
+        if self._bootstrap_depth == 0 and record_id in self.pinned_guard:
+            raise PinnedRecordError(f"public writer refuses pinned record_id {record_id!r}")
+
+    @contextmanager
+    def _bootstrap_writes(self) -> Iterator[None]:
+        """Private bootstrap-only exception to the identity pinned guard."""
+
+        self._bootstrap_depth += 1
+        try:
+            yield
+        finally:
+            self._bootstrap_depth -= 1
 
     def _preflight(self, *, readonly: bool) -> None:
         """Refuse WAL and foreign files before SQLite ever opens them.
@@ -208,7 +238,7 @@ class MemoryStore:
             raise FileNotFoundError(self.db_path)
         with self._raw_connect(readonly=readonly) as conn:
             if require_schema:
-                self._assert_schema(conn)
+                self._assert_schema(conn, writable=not readonly)
             yield conn
 
     def schema_info(self) -> dict[str, Any]:
@@ -233,6 +263,8 @@ class MemoryStore:
             application_id not in {0, APPLICATION_ID}
         ):
             state = "incompatible"
+        elif application_id == APPLICATION_ID and user_version == LEGACY_V4_VERSION:
+            state = "legacy-v4"
         elif "memory_records_v2" in tables:
             state = "legacy-v2"
         elif (
@@ -265,6 +297,10 @@ class MemoryStore:
         if before["state"] == "incompatible":
             raise SchemaVersionError(
                 "database application_id/user_version is newer or foreign"
+            )
+        if before["state"] == "legacy-v4":
+            raise MigrationRequiredError(
+                "schema v4 store must be migrated to v5 before writing"
             )
         if before["state"] in {"legacy-v2", "legacy-v3"} and not migrate:
             raise MigrationRequiredError(
@@ -313,25 +349,81 @@ class MemoryStore:
     def init(self) -> None:
         self.initialize()
 
-    def migrate_to(self, target_path: str | Path) -> "MemoryStore":
-        """Copy a store and migrate only the copy, leaving the source untouched."""
+    def migrate_to(
+        self,
+        target_path: str | Path,
+        *,
+        dry_run: bool = False,
+        backup_path: str | Path | None = None,
+    ) -> "MemoryStore | dict[str, Any]":
+        """Rehearse or create an explicit migrated copy; never replace source.
+
+        For v4 the migration is additive: execute the v5 ``IF NOT EXISTS``
+        schema on the copy and then advance ``user_version``.  An actual run
+        also keeps a byte-for-byte v4 backup next to the requested target (or
+        at ``backup_path``).  A dry run uses a temporary copy and leaves no
+        output behind.
+        """
 
         target = Path(target_path)
         if target.exists():
             raise FileExistsError(target)
-        target.parent.mkdir(parents=True, exist_ok=True)
         if not self.db_path.exists():
-            migrated = MemoryStore(target)
+            if dry_run:
+                return {"state": "ready", "from": "uninitialized", "dry_run": True}
+            migrated = MemoryStore(target, pinned_guard=tuple(self.pinned_guard))
             migrated.initialize()
             return migrated
-        with self._raw_connect(readonly=True) as source:
-            with sqlite3.connect(target) as destination:
-                source.backup(destination)
-        migrated = MemoryStore(target)
-        migrated.initialize()
-        return migrated
+        before = self.schema_info()
+        if before["state"] not in {"legacy-v4", "legacy-v3", "legacy-v2"}:
+            raise MigrationRequiredError(
+                f"store state {before['state']!r} is not an explicit migration source"
+            )
 
-    def _assert_schema(self, conn: sqlite3.Connection) -> None:
+        def migrate_copy(copy_path: Path) -> MemoryStore:
+            shutil.copy2(self.db_path, copy_path)
+            migrated_store = MemoryStore(
+                copy_path, pinned_guard=tuple(self.pinned_guard)
+            )
+            if before["state"] == "legacy-v4":
+                schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+                with migrated_store._raw_connect() as conn:
+                    conn.executescript(schema)
+                    conn.execute(
+                        "INSERT INTO memory_meta_v3(key,value) VALUES('schema_version',?) "
+                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        (str(SCHEMA_VERSION),),
+                    )
+                    conn.execute(f"PRAGMA application_id={APPLICATION_ID}")
+                    conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            else:
+                migrated_store.initialize()
+            if migrated_store.schema_info()["state"] != "ready":
+                raise RuntimeError("migration copy did not reach schema v5")
+            return migrated_store
+
+        if dry_run:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="trajecta-migrate-dry-run-", dir=target.parent) as tmp:
+                rehearsal = migrate_copy(Path(tmp) / target.name)
+                return {
+                    "state": rehearsal.schema_info()["state"],
+                    "from": before["state"],
+                    "dry_run": True,
+                }
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        backup = Path(backup_path) if backup_path is not None else target.with_name(target.name + ".v4.bak")
+        if backup.exists():
+            raise FileExistsError(backup)
+        shutil.copy2(self.db_path, backup)
+        try:
+            return migrate_copy(target)
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+
+    def _assert_schema(self, conn: sqlite3.Connection, *, writable: bool) -> None:
         application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
         user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
         if application_id == APPLICATION_ID and user_version == SCHEMA_VERSION:
@@ -349,6 +441,12 @@ class MemoryStore:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )
         }
+        if application_id == APPLICATION_ID and user_version == LEGACY_V4_VERSION:
+            if writable:
+                raise MigrationRequiredError(
+                    "schema v4 store must be migrated to v5 before writing"
+                )
+            return
         if "memory_records_v2" in tables:
             raise MigrationRequiredError(
                 "legacy v2 store must be initialized or migrated before use"
@@ -358,7 +456,7 @@ class MemoryStore:
             and user_version == LEGACY_V3_VERSION
         ):
             raise MigrationRequiredError(
-                "schema v3 store must be initialized or migrated to v4 before use"
+                "schema v3 store must be initialized or migrated to v5 before use"
             )
         raise SchemaVersionError("memory database is not initialized")
 
@@ -448,6 +546,7 @@ class MemoryStore:
         evidence: dict[str, Any],
         idempotency_key: str,
     ) -> dict[str, Any]:
+        self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
             prior = self._operation_by_key(conn, idempotency_key)
@@ -536,6 +635,7 @@ class MemoryStore:
         surface: str = "",
         model_family: str = "",
     ) -> dict[str, Any]:
+        self._guard_pinned(record_id)
         if operation_type not in {"correct", "refine", "supersede"}:
             raise ValueError("unsupported semantic operation")
         semantic_fields = {
@@ -659,6 +759,7 @@ class MemoryStore:
         idempotency_key: str,
         surface: str = "",
     ) -> dict[str, Any]:
+        self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
             prior = self._operation_by_key(conn, idempotency_key)
@@ -700,6 +801,163 @@ class MemoryStore:
                 effective_at=now,
             )
             return self._operation_result(conn, operation)
+
+    def _revise_in(
+        self,
+        conn: sqlite3.Connection,
+        record_id: str,
+        *,
+        actor: str,
+        reason: str,
+        idempotency_key: str,
+        changes: dict[str, Any],
+        evidence_ids: list[str],
+        operation_id: str,
+        surface: str = "",
+        model_family: str = "",
+    ) -> str:
+        """Materialize a revision on an already-held authority transaction."""
+
+        current = conn.execute(
+            "SELECT * FROM memory_current_v3 WHERE record_id=?", (record_id,)
+        ).fetchone()
+        if not current:
+            raise ValueError("current record not found")
+        now = utc_now()
+        next_number = int(current["revision_number"]) + 1
+        revision_id = self._revision_id(record_id, next_number, idempotency_key)
+        revision = {
+            key: current[key]
+            for key in (
+                "title", "summary", "content", "impact", "confidence",
+                "valid_from", "authority_status",
+            )
+        }
+        revision.update({
+            key: value for key, value in changes.items()
+            if key in {"title", "summary", "content", "impact", "confidence", "authority_status", "valid_from"}
+        })
+        revision.update({
+            "revision_id": revision_id,
+            "record_id": record_id,
+            "parent_revision_id": current["revision_id"],
+            "revision_number": next_number,
+            "created_at": now,
+            "created_by": actor,
+            "surface": surface,
+            "model_family": model_family,
+            "reason": reason,
+            "idempotency_key": idempotency_key,
+        })
+        revision["confidence"] = clamp(revision["confidence"])
+        revision["content_sha256"] = semantic_hash(revision)
+        self._insert_revision(conn, revision)
+        self._insert_telemetry(
+            conn,
+            revision_id,
+            salience=changes.get("salience", current["salience"]),
+            stability=changes.get("stability", current["stability"]),
+            accessibility=changes.get("accessibility", current["accessibility"]),
+            now=now,
+        )
+        for evidence_id in evidence_ids:
+            self._link_evidence(conn, revision_id, evidence_id, "supports", reason)
+        self._append_lifecycle(
+            conn,
+            record_id=record_id,
+            revision_id=current["revision_id"],
+            state="superseded",
+            actor=actor,
+            surface=surface,
+            reason=reason,
+            operation_id=operation_id,
+            idempotency_key=f"{idempotency_key}:lifecycle:superseded",
+            effective_at=now,
+        )
+        self._append_lifecycle(
+            conn,
+            record_id=record_id,
+            revision_id=revision_id,
+            state="current",
+            actor=actor,
+            surface=surface,
+            reason=reason,
+            operation_id=operation_id,
+            idempotency_key=f"{idempotency_key}:lifecycle:current",
+            effective_at=now,
+        )
+        return revision_id
+
+    def _invalidate_in(
+        self,
+        conn: sqlite3.Connection,
+        record_id: str,
+        *,
+        actor: str,
+        reason: str,
+        idempotency_key: str,
+        evidence_ids: list[str],
+        operation_id: str,
+        surface: str = "",
+    ) -> str:
+        """Append invalidation state on an already-held authority transaction."""
+
+        current = conn.execute(
+            "SELECT * FROM memory_current_v3 WHERE record_id=?", (record_id,)
+        ).fetchone()
+        if not current:
+            raise ValueError("current record not found")
+        for evidence_id in evidence_ids:
+            self._link_evidence(
+                conn, current["revision_id"], evidence_id, "contradicts", reason
+            )
+        self._append_lifecycle(
+            conn,
+            record_id=record_id,
+            revision_id=current["revision_id"],
+            state="invalidated",
+            actor=actor,
+            surface=surface,
+            reason=reason,
+            operation_id=operation_id,
+            idempotency_key=f"{idempotency_key}:lifecycle:invalidated",
+            effective_at=utc_now(),
+        )
+        return str(current["revision_id"])
+
+    def _retract_relation_in(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        latest: sqlite3.Row,
+        actor: str,
+        surface: str,
+        reason: str,
+        idempotency_key: str,
+    ) -> sqlite3.Row:
+        """Append a relation retraction without creating a second operation."""
+
+        sequence = int(latest["sequence_number"]) + 1
+        event_id = "relation-event:" + hashlib.sha256(
+            idempotency_key.encode("utf-8")
+        ).hexdigest()[:32]
+        conn.execute(
+            "INSERT INTO memory_relation_events_v4("
+            "relation_event_id,relation_id,from_record_id,to_record_id,"
+            "relation_type,sequence_number,event_type,weight,"
+            "source_revision_id,evidence_id,actor,surface,reason,"
+            "idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                event_id, latest["relation_id"], latest["from_record_id"],
+                latest["to_record_id"], latest["relation_type"], sequence,
+                "retract", 0.0, None, None, actor, surface, reason,
+                idempotency_key, utc_now(),
+            ),
+        )
+        return conn.execute(
+            "SELECT * FROM memory_relation_events_v4 WHERE relation_event_id=?",
+            (event_id,),
+        ).fetchone()
 
     def add_cue(
         self,

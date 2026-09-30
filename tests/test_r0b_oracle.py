@@ -161,7 +161,7 @@ def test_readonly_wal_refused_before_sqlite_opens(tmp_path: Path):
 
 @pytest.mark.parametrize(
     "header",
-    [{"application_id": 1234}, {"user_version": 5}],
+    [{"application_id": 1234}, {"user_version": 6}],
     ids=["foreign", "future"],
 )
 def test_writable_refuses_foreign_or_future_wal_untouched(tmp_path: Path, header):

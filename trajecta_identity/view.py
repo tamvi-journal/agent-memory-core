@@ -18,7 +18,8 @@ from .identity import PINNED, IdentityMemory
 
 
 def snapshot(memory: IdentityMemory) -> dict[str, Any]:
-    memory.bootstrap()
+    if memory.store.schema_info()["state"] == "uninitialized":
+        memory.bootstrap()
     rows = [row for row in memory.store.current_view() if row["domain"] != "anchor"]
     nodes = []
     for row in rows:
@@ -53,6 +54,7 @@ def snapshot(memory: IdentityMemory) -> dict[str, Any]:
         "timeline": memory.timeline(200),
         "nodes": nodes,
         "relations": relations,
+        "open_core_proposals": memory.open_core_proposals(),
         "open_discussions": memory.open_discussions(),
         "open_loops": memory.open_loops(),
     }
@@ -94,7 +96,8 @@ function render(){
   $("agent").textContent=data.agent;
   const s=data.status;
   $("meta").textContent=`profile ${data.profile} · owner ${data.owner} · `+Object.entries(s.activation||{}).map(([k,v])=>`${v} ${k}`).join(" · ");
-  $("alerts").innerHTML=data.open_discussions.map(d=>`<div class="card alert"><b>Core revision to discuss with ${esc(data.owner)}</b><div class="muted">${esc(d.reason)} · since ${esc(d.since)}</div></div>`).join("")
+  $("alerts").innerHTML=data.open_core_proposals.map(d=>`<div class="card alert"><b>Core proposal awaiting ${esc(data.owner)}</b><div class="muted">${esc(d.reason)} · ${esc(d.proposal_id)}${d.stale?" · stale":""}</div></div>`).join("")
+    +data.open_discussions.map(d=>`<div class="card alert"><b>Legacy core discussion</b><div class="muted">${esc(d.reason)} · since ${esc(d.since)}</div></div>`).join("")
     +(data.open_loops.length?`<div class="card"><b>Open loops</b><ul class="rel">${data.open_loops.map(l=>`<li>${esc(l.title)}</li>`).join("")}</ul></div>`:"");
   const c=data.core;
   $("core").innerHTML=c?`<b>${esc(c.title)}</b> <span class="pill pinned">revision ${c.revisions}</span><div>${esc(c.summary)}</div>

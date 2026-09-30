@@ -438,3 +438,91 @@ WHERE e.event_type='assert'
       FROM memory_relation_events_v4 latest
       WHERE latest.relation_id=e.relation_id
   );
+
+-- Schema v5: owner authority receipts for canonical identity-core changes.
+CREATE TABLE IF NOT EXISTS memory_core_proposals_v5 (
+    proposal_id TEXT PRIMARY KEY,
+    profile TEXT NOT NULL,
+    record_id TEXT NOT NULL CHECK(record_id = 'core'),
+    base_core_revision_id TEXT NOT NULL REFERENCES memory_revisions_v3(revision_id),
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    content TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    phase_context_json TEXT NOT NULL,
+    phase_context_sha256 TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    reason_sha256 TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    proposal_sha256 TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    surface TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS memory_owner_receipts_v5 (
+    receipt_id TEXT PRIMARY KEY,
+    purpose TEXT NOT NULL CHECK(purpose IN (
+        'identity_core_revision','identity_retract','identity_legacy_discussion_close'
+    )),
+    profile TEXT NOT NULL,
+    binding_json TEXT NOT NULL,
+    binding_sha256 TEXT NOT NULL UNIQUE,
+    issued_at TEXT NOT NULL,
+    issued_by TEXT NOT NULL,
+    authority TEXT NOT NULL CHECK(authority = 'owner'),
+    guard TEXT NOT NULL CHECK(guard = 'tty-human-presence/v1')
+);
+
+CREATE TABLE IF NOT EXISTS memory_receipt_consumptions_v5 (
+    receipt_id TEXT PRIMARY KEY REFERENCES memory_owner_receipts_v5(receipt_id),
+    operation_id TEXT NOT NULL UNIQUE REFERENCES memory_operations_v3(operation_id),
+    consumed_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memory_proposal_decisions_v5 (
+    proposal_id TEXT PRIMARY KEY REFERENCES memory_core_proposals_v5(proposal_id),
+    receipt_id TEXT NOT NULL UNIQUE REFERENCES memory_owner_receipts_v5(receipt_id),
+    outcome TEXT NOT NULL CHECK(outcome IN ('applied','rejected')),
+    core_revision_id TEXT REFERENCES memory_revisions_v3(revision_id),
+    decided_at TEXT NOT NULL,
+    CHECK((outcome = 'applied') = (core_revision_id IS NOT NULL))
+);
+
+CREATE VIEW IF NOT EXISTS memory_open_core_proposals_v5 AS
+SELECT p.* FROM memory_core_proposals_v5 p
+LEFT JOIN memory_proposal_decisions_v5 d ON d.proposal_id = p.proposal_id
+WHERE d.proposal_id IS NULL;
+
+CREATE TRIGGER IF NOT EXISTS memory_core_proposals_v5_no_update
+BEFORE UPDATE ON memory_core_proposals_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_core_proposals_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_core_proposals_v5_no_delete
+BEFORE DELETE ON memory_core_proposals_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_core_proposals_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_owner_receipts_v5_no_update
+BEFORE UPDATE ON memory_owner_receipts_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_owner_receipts_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_owner_receipts_v5_no_delete
+BEFORE DELETE ON memory_owner_receipts_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_owner_receipts_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_receipt_consumptions_v5_no_update
+BEFORE UPDATE ON memory_receipt_consumptions_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_receipt_consumptions_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_receipt_consumptions_v5_no_delete
+BEFORE DELETE ON memory_receipt_consumptions_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_receipt_consumptions_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_proposal_decisions_v5_no_update
+BEFORE UPDATE ON memory_proposal_decisions_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_proposal_decisions_v5 is append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS memory_proposal_decisions_v5_no_delete
+BEFORE DELETE ON memory_proposal_decisions_v5 BEGIN
+    SELECT RAISE(ABORT, 'memory_proposal_decisions_v5 is append-only');
+END;

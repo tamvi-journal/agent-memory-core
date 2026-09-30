@@ -56,6 +56,7 @@ class ValidatedIntake:
 
     def submit(self, **proposal: Any) -> dict[str, Any]:
         payload = self._normalized_proposal(proposal, require_key=True)
+        self.store._guard_pinned(payload["record_id"])
         self.store.init()
         proposal_sha256 = hash_payload(payload)
         prior = self._intake_by_key(payload["idempotency_key"])

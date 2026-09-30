@@ -79,7 +79,7 @@ function sqliteFile(path: string, applicationId: number, userVersion: number): v
   database.close();
 }
 
-for (const [label, applicationId, userVersion] of [["foreign", 1234, 4], ["future", 0x414d4333, 5]] as const) {
+for (const [label, applicationId, userVersion] of [["foreign", 1234, 4], ["future", 0x414d4333, 6]] as const) {
   test(`post-open recheck refuses a ${label} file swapped in after the header preflight`, () => {
     const directory = mkdtempSync(resolve(tmpdir(), "trajecta-r1-toctou-"));
     const database = resolve(directory, "store.sqlite3");
