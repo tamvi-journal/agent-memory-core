@@ -1,55 +1,63 @@
+"""Frozen Unicode 14 text normalization for retrieval and evidence identity."""
+
 from __future__ import annotations
 
+import hashlib
+import json
 import re
-import unicodedata
+import sys
+from functools import lru_cache
+from pathlib import Path
 
 
 TEXT_NORMALIZER_VERSION = "text-norm/v2"
-
-# Letters that NFKD does not decompose into an ASCII base plus combining marks.
-# Without this map they are silently dropped: "đuôi" became "uoi".
-_TRANSLITERATE = str.maketrans(
-    {
-        "đ": "d",
-        "ð": "d",
-        "ł": "l",
-        "ø": "o",
-        "ħ": "h",
-        "ı": "i",
-        "ŧ": "t",
-        "æ": "ae",
-        "œ": "oe",
-        "þ": "th",
-    }
-)
+_TABLES = Path(__file__).resolve().parents[1] / "spec" / "tables"
+_WHEEL_TABLES = Path(sys.prefix) / "share" / "trajecta-identity-memory" / "tables"
+_DIGESTS = {
+    "text-norm/v2": ("text-norm-v2.json", "d1b7f523d9bbd35968543ef9582837d8cd28d8bb8a1fb1771f001682618c9b69"),
+    "identity-v1": ("identity-v1.json", "51dab4bc79928eef80a063130f4638864a0c97391964c81a14ad32dd999749a9"),
+}
 
 
-def _fold(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    return "".join(char for char in normalized if not unicodedata.combining(char))
+@lru_cache(maxsize=2)
+def _table(name: str) -> dict[str, str]:
+    file, expected = _DIGESTS[name]
+    path = _TABLES / file if _TABLES.exists() else _WHEEL_TABLES / file
+    raw = path.read_bytes()
+    actual = hashlib.sha256(raw).hexdigest()
+    if actual != expected:
+        raise RuntimeError(f"normalizer table {file} sha256 mismatch: {actual}")
+    payload = json.loads(raw)
+    if (payload.get("schema"), payload.get("name"), payload.get("unicode")) != (
+        "trajecta.norm-table/v1", name, "14.0.0"
+    ):
+        raise RuntimeError(f"normalizer table {file} has invalid metadata")
+    return payload["map"]
 
 
-def normalize_text(value: str) -> str:
-    """Retrieval normalizer (`text-norm/v2`).
-
-    Case-folds, transliterates letters NFKD cannot decompose, strips
-    combining marks and keeps ``[a-z0-9_]`` word runs.
-    """
-
-    folded = _fold(value.casefold().translate(_TRANSLITERATE))
+def _normalize(value: str, name: str) -> str:
+    table = _table(name)
+    folded = "".join(table.get(f"{ord(char):x}", " ") for char in value)
     return " ".join(re.findall(r"[a-z0-9_]+", folded))
 
 
+def normalize_text(value: str) -> str:
+    """Retrieval normalizer (`text-norm/v2`), pinned to Unicode 14."""
+
+    return _normalize(value, "text-norm/v2")
+
+
 def normalize_identity_v1(value: str) -> str:
-    """Frozen normalizer used by ``evidence-v2`` identity segments.
+    """Frozen evidence-v2 identity normalizer, pinned to Unicode 14."""
 
-    Evidence identity must stay deterministic across releases, so it keeps
-    the original behavior, including dropping undecomposable letters. Do not
-    change this function; introduce a new evidence identity version instead.
-    """
-
-    return " ".join(re.findall(r"[a-z0-9_]+", _fold(value.casefold())))
+    return _normalize(value, "identity-v1")
 
 
 def tokens(value: str) -> list[str]:
     return [part for part in normalize_text(value).split() if len(part) > 1]
+
+
+# Loading the runtime also verifies both pinned artifacts, including the
+# evidence identity table even if the first operation is only a retrieval.
+_table("text-norm/v2")
+_table("identity-v1")

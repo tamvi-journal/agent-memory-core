@@ -1,0 +1,1 @@
+{"current_view":null,"historical_view":null,"identity_packet_json":null,"input":{"operation":"read"},"label":"foreign-app","open_discussions":null,"open_loops":null,"packet_text":null,"ranked_hits":null,"result":{"error":"SchemaVersionError","message":"database is newer than this runtime or belongs to another application"},"selected_hits":null,"status":null,"timeline":null}

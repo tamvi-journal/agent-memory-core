@@ -1,0 +1,1 @@
+{"current_view":null,"historical_view":null,"identity_packet_json":null,"input":{"operation":"read"},"label":"empty-file","open_discussions":null,"open_loops":null,"packet_text":null,"ranked_hits":null,"result":{"error":"SchemaVersionError","message":"memory database is not initialized"},"selected_hits":null,"status":null,"timeline":null}

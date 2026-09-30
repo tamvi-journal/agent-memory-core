@@ -37,6 +37,13 @@ include = ["memory_core*", "trajecta_identity*"]
 memory_core = ["schema.sql"]
 trajecta_identity = ["profiles/*/profile.json", "profiles/SETUP.md"]
 
+[tool.setuptools.data-files]
+"share/trajecta-identity-memory/tables" = [
+  "spec/tables/text-norm-v2.json",
+  "spec/tables/identity-v1.json",
+  "spec/tables/version-sensitive.json",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
