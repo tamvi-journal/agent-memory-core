@@ -147,11 +147,17 @@ for (const scenario of scenarios) {
         const oracle = expected.result === undefined ? clone(expected) : expected.result;
         if (expected.result === undefined) {
           delete oracle.write_outcomes;
-          oracle.identity_packet_json.open_core_proposals = [];
+          // Additive-field rule (R2a §2.1). Closed list; same as tests/test_r0_corpus_on_v5.py.
+          assert.equal(oracle.status.store, "ready");
+          assert.notEqual(oracle.status.write_policy, "self-authored proposals; owner receipt controls canonical core");
+          assert.equal("open_core_proposals" in oracle.identity_packet_json, false);
+          assert.equal("open_core_proposals" in oracle.status, false);
+          if (!("error" in oracle.identity_packet_json)) oracle.identity_packet_json.open_core_proposals = [];
           oracle.status.store = "legacy-v4";
           oracle.status.write_policy = "self-authored proposals; owner receipt controls canonical core";
           oracle.status.open_core_proposals = 0;
         }
+        if (expected.label === "legacy-v3") assert.equal(oracle.message, "schema v3 store must be initialized or migrated to v4 before use");
         if (expected.label === "legacy-v3") oracle.message = "schema v3 store must be initialized or migrated to v5 before use";
         assert.deepEqual(actual, oracle);
         assert.deepEqual(readFileSync(database), copyBefore, "read changed the copied store");

@@ -456,7 +456,7 @@ class MemoryStore:
             and user_version == LEGACY_V3_VERSION
         ):
             raise MigrationRequiredError(
-                "schema v3 store must be initialized or migrated to v4 before use"
+                "schema v3 store must be initialized or migrated to v5 before use"
             )
         raise SchemaVersionError("memory database is not initialized")
 

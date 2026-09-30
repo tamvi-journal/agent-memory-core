@@ -502,3 +502,37 @@ def test_crash_after_revision_insert_rolls_back_everything(memory: IdentityMemor
     with memory.store.connect(readonly=True) as conn:
         assert conn.execute("SELECT COUNT(*) FROM memory_proposal_decisions_v5").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM memory_receipt_consumptions_v5").fetchone()[0] == 0
+
+
+def test_process_kill_after_revision_insert_leaves_no_partial_state(memory: IdentityMemory):
+    """Spec §7: a real crash (the process dies mid-transaction, no Python unwinding)."""
+    import subprocess
+    import sys
+
+    proposal = propose(memory)
+    receipt = issue_core(memory, proposal)
+    before = memory.db_path.read_bytes()
+    operations = operation_count(memory)
+    script = (
+        "import os, sys\n"
+        "from trajecta_identity.identity import IdentityMemory\n"
+        "from trajecta_identity.profile import load_profile\n"
+        "mem = IdentityMemory(load_profile('example'), sys.argv[1], surface='test')\n"
+        "mem.store._insert_telemetry = lambda *a, **k: os._exit(17)\n"
+        "mem.identity_core_apply(sys.argv[2])\n"
+    )
+    killed = subprocess.run(
+        [sys.executable, "-c", script, str(memory.db_path), receipt["receipt_id"]],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    assert killed.returncode == 17, killed.stderr
+    reopened = MemoryStore(memory.db_path, pinned_guard=PINNED)
+    assert operation_count(memory) == operations
+    assert len(reopened.historical_view("core")) == 1
+    with reopened.connect(readonly=True) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM memory_proposal_decisions_v5").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM memory_receipt_consumptions_v5").fetchone()[0] == 0
+    # The owner can still settle it after the crash.
+    memory.identity_core_apply(receipt["receipt_id"])
+    assert len(memory.store.historical_view("core")) == 2
+    assert memory.db_path.read_bytes() != before

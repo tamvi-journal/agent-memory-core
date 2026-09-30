@@ -53,7 +53,13 @@ WRITABLE_SCHEMA_VERSION  = 5
   - it then removes exactly those new keys and compares everything else byte for byte against the frozen expected output;
   - the rendered packet text does not change when there are no proposals (no empty section is rendered), so `packet_text` is compared unmodified.
 
-  Any other difference fails. The frozen R0 corpus is never regenerated for R2a.
+  - **Settlement-changed fields** (a closed list, the direct consequence of Q1 and of v5 being the only writable version). The runner asserts the frozen value first, then the new one:
+    - `status.store`: `"ready"` → `"legacy-v4"`;
+    - `status.write_policy`: → `"self-authored proposals; owner receipt controls canonical core"`;
+    - the `legacy-v3` error message: `"… migrated to v4 before use"` → `"… migrated to v5 before use"`.
+  - Both runtimes run this rule against every R0 case (`tests/test_r0_corpus_on_v5.py`, `node/test/conformance.test.ts`), on a copy, with the copy and the checked-in bytes unchanged.
+
+  Any other difference fails. The frozen R0 corpus is never regenerated for R2a. Its CI gate is authentication (MANIFEST sha256 of every file) plus the v5-reader replay above, because the v4 writers that generated it no longer exist.
 
 ### 2.2 Tables
 
