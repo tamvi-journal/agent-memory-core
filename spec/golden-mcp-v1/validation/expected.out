@@ -1,0 +1,17 @@
+{"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: extra: unknown key"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: cue: missing required key"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 3, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: cue: expected string"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 4, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: cue: shorter than 1 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 5, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: cue: longer than 2000 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 6, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: limit: below minimum 1"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 7, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: limit: above maximum 24"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 8, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: limit: expected integer"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 9, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: limit: expected integer"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 10, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: limit: expected integer"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 11, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_retrieve: track: expected boolean"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 20, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_log_phase: event_id: shorter than 2 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 21, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_log_phase: event_id: shorter than 2 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 22, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_log_phase: event_id: shorter than 2 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 23, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_log_phase: event_id: shorter than 2 characters"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 24, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_core_propose: vho_stack/runtime_architecture: expected string"}], "isError": true}}
+{"jsonrpc": "2.0", "id": 25, "result": {"content": [{"type": "text", "text": "ValueError: invalid arguments for identity_core_propose: vho_stack/unknown: unknown key"}], "isError": true}}

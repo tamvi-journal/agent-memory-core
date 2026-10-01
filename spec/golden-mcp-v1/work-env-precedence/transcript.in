@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_status","arguments":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"env-ref","title":"Work","summary":"linked work","work_refs":["work:aaaaaaaa-0001"]}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"profile-ref","title":"Work","summary":"linked work","work_refs":["work:bbbbbbbb-0002"]}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"identity_retrieve","arguments":{"cue":"linked work","track":false}}}

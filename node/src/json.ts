@@ -1,6 +1,6 @@
 import { orderedObject, type JsonValue, type OrderedObject, type PyFloat, type PyInt } from "./encoding.ts";
 
-export function parseLossless(source: string): JsonValue {
+export function parseLossless(source: string, options: { allowLoneSurrogates?: boolean } = {}): JsonValue {
   let offset = 0;
   const fail = (message: string): never => {
     throw new SyntaxError(`${message} at ${offset}`);
@@ -14,14 +14,15 @@ export function parseLossless(source: string): JsonValue {
     while (offset < source.length) {
       const char = source[offset++];
       if (char === '"') {
-        for (let index = 0; index < result.length; index++) {
-          const unit = result.charCodeAt(index);
-          if (unit >= 0xd800 && unit <= 0xdbff) {
-            const next = result.charCodeAt(index + 1);
-            if (!(next >= 0xdc00 && next <= 0xdfff)) fail("lone surrogate in string");
-            index++;
-          } else if (unit >= 0xdc00 && unit <= 0xdfff) fail("lone surrogate in string");
-        }
+        if (!options.allowLoneSurrogates)
+          for (let index = 0; index < result.length; index++) {
+            const unit = result.charCodeAt(index);
+            if (unit >= 0xd800 && unit <= 0xdbff) {
+              const next = result.charCodeAt(index + 1);
+              if (!(next >= 0xdc00 && next <= 0xdfff)) fail("lone surrogate in string");
+              index++;
+            } else if (unit >= 0xdc00 && unit <= 0xdfff) fail("lone surrogate in string");
+          }
         return result;
       }
       if (char !== "\\") {

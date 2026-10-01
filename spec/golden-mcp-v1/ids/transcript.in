@@ -1,0 +1,10 @@
+{"jsonrpc":"2.0","id":0,"method":"ping"}
+{"jsonrpc":"2.0","id":9007199254740993,"method":"ping"}
+{"jsonrpc":"2.0","id":"x","method":"ping"}
+{"jsonrpc":"2.0","id":null,"method":"ping"}
+{"jsonrpc":"2.0","id":1.0,"method":"ping"}
+{"jsonrpc":"2.0","id":true,"method":"ping"}
+{"jsonrpc":"2.0","id":{},"method":"ping"}
+{"jsonrpc":"2.0","id":[],"method":"ping"}
+{"jsonrpc":"2.0","id":"\ud800","method":"ping"}
+{"jsonrpc":"2.0","id":"safe","method":"ping","extra":"\ud800"}

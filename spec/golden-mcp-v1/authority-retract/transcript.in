@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_retract","arguments":{"receipt_id":"receipt:35978ccb6a83d1aa18ff0ae0adb42b7d"}}}

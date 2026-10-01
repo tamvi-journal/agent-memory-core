@@ -93,3 +93,19 @@ jobs:
             PYTHONHASHSEED="$seed" python tools/golden_writes/generate.py --output "$output"
             diff -qr spec/golden-writes-v5 "$output"
           done
+
+  mcp-corpus:
+    name: ubuntu / py3.11 / MCP v1 corpus
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate MCP v1 under three hash seeds
+        run: |
+          set -eu
+          for seed in 0 1 4294967295; do
+            output="$(mktemp -d)/golden-mcp-v1"
+            PYTHONHASHSEED="$seed" python tools/golden_mcp/generate.py --output "$output"
+            diff -ru spec/golden-mcp-v1 "$output"
+          done

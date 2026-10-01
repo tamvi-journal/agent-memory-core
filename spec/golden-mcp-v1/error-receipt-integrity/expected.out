@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "ReceiptIntegrityError: receipt binding_sha256 mismatch"}], "isError": true}}

@@ -1,0 +1,5 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_status","arguments":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"identity_retrieve","arguments":{"cue":"who are you"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"identity_timeline","arguments":{}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"identity_core_proposals","arguments":{}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"blocked","title":"Blocked","summary":"Blocked"}}}

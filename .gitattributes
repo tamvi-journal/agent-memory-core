@@ -4,3 +4,7 @@
 *.ps1 text eol=crlf
 # Canonical document: its sha256 is pinned in memory_core.vho. Never convert.
 docs/VECTOR-HUMAN-ONTOLOGY.md -text
+spec/golden-mcp-v1/**/transcript.in -text
+spec/golden-mcp-v1/**/expected.out -text
+spec/golden-mcp-v1/**/*.sqlite3 -text
+spec/golden-mcp-v1/**/*-wal -text

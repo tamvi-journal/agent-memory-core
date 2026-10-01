@@ -1,0 +1,12 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"phase-one","title":"Phase","summary":"Open loop","open_loop":true,"phase_context":{"2":2,"1":1.0}}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"identity_log_fact","arguments":{"fact_id":"int-confidence","title":"Integer","summary":"typed","confidence":1}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"identity_log_fact","arguments":{"fact_id":"float-confidence","title":"Float","summary":"typed","confidence":1.0}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"identity_core_propose","arguments":{"reason":"new reading","phase_context":{"model":"oracle","harness":"mcp"}}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"identity_core_proposals","arguments":{}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"identity_retrieve","arguments":{"cue":"phase","track":false}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"identity_retrieve","arguments":{"cue":"phase"}}}
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"identity_timeline","arguments":{}}}
+{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"identity_status","arguments":{}}}
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"identity_close_loop","arguments":{"record_id":"phase:phase-one","note":"settled"}}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"identity_core_apply","arguments":{"receipt_id":"receipt:00000000000000000000000000000000"}}}
+{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"identity_core_propose","arguments":{"reason":"domain validation","phase_context":{}}}}

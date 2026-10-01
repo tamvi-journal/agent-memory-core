@@ -1,0 +1,5 @@
+{"jsonrpc":"2.0","id":1,"method":"ping"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"unknown"}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"notification","title":"No","summary":"No"}}}
+{"jsonrpc":"2.0","id":4,"method":"notifications/foo"}
