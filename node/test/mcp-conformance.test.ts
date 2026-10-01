@@ -184,7 +184,13 @@ for (const name of readdirSync(GOLDEN)
     const profile = name === "work-store-error" ? customWorkProfile(directory) : PROFILE;
     const result = await runMcp(directory, profile, readFileSync(resolve(scenario, "transcript.in")));
     assert.equal(result.code, 0, result.stderr.toString("utf8"));
-    assert.deepEqual(result.stdout, readFileSync(resolve(scenario, "expected.out")));
+    // Product code reports native paths (as Python does on each OS). Only the test maps the
+    // OS separator of the relative work root back to the Linux-generated oracle.
+    const stdout =
+      process.platform === "win32"
+        ? Buffer.from(result.stdout.toString("utf8").replaceAll("work\\\\state.json", "work/state.json"), "utf8")
+        : result.stdout;
+    assert.deepEqual(stdout, readFileSync(resolve(scenario, "expected.out")));
 
     const database = resolve(directory, "store.sqlite3");
     if (existsSync(resolve(scenario, "absent"))) {

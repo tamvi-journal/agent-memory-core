@@ -222,16 +222,6 @@ function toolError(error: unknown): OrderedObject {
   if (PUBLIC_ERRORS.has(name)) {
     const wireName = name === "MigrationRequired" ? "MigrationRequiredError" : name;
     let message = String(candidate.message ?? "");
-    if (name === "WorkStoreError" && process.platform === "win32") {
-      const prefix = "unsupported work state schema in ";
-      const separator = ": '";
-      if (message.startsWith(prefix) && message.includes(separator)) {
-        const split = message.indexOf(separator, prefix.length);
-        message = prefix + message.slice(prefix.length, split).replaceAll("\\", "/") + message.slice(split);
-      } else if (message.startsWith("unreadable work state: ")) {
-        message = "unreadable work state: " + message.slice("unreadable work state: ".length).replaceAll("\\", "/");
-      }
-    }
     text = `${wireName}: ${message}`;
   } else {
     process.stderr.write(`${candidate?.stack ?? String(error)}\n`);
