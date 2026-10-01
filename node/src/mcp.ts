@@ -473,10 +473,14 @@ function argumentsFrom(argv: string[]): { profile: string; database: string } {
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const argumentsValue = argumentsFrom(argv);
   const clockStart = process.env.TRAJECTA_IDENTITY_MCP_CLOCK_START;
+  // Python WorkStore.from_config: a non-blank $TRAJECTA_WORK_ROOT wins over the
+  // profile's work_root; a blank or whitespace-only value falls back to the profile.
+  const envWorkRoot = process.env.TRAJECTA_WORK_ROOT?.trim();
   const memory = new IdentityMemory(loadProfile(argumentsValue.profile), argumentsValue.database, {
     surface: "mcp",
     displayDatabase: argumentsValue.database,
     ...(clockStart ? { clock: new InjectedClock(clockStart) } : {}),
+    ...(envWorkRoot ? { workRoot: envWorkRoot } : {}),
   });
   const server = new McpServer(memory, packageVersion());
   await serve(server, process.stdin, async (response) => {

@@ -394,6 +394,77 @@ def v4_reads_transcript(_: dict[str, str]) -> bytes:
     )
 
 
+WORK_ITEM = (
+    '{"id":"%s","topic":"%s","goal":"parity","status":"active","revision":3,'
+    '"nextAction":"replay","openLoops":["crash"],"activeBranchId":"branch:one",'
+    '"branches":[{"id":"branch:one","label":"writers"}],"updatedAt":"2026-09-30T00:00:00Z"}'
+)
+
+
+def _work_dir(root: Path, item_id: str, topic: str) -> None:
+    root.mkdir()
+    root.joinpath("state.json").write_text(
+        '{"schema":"trajecta.state/v1","work":[' + WORK_ITEM % (item_id, topic) + "]}\n", encoding="utf-8"
+    )
+
+
+def _profile_with_work_root(path: Path, name: str, work_root: str | None) -> str:
+    profile = json.loads((ROOT / "trajecta_identity" / "profiles" / "example" / "profile.json").read_text())
+    profile["name"] = name
+    profile.pop("work_root", None)
+    if work_root is not None:
+        profile["work_root"] = work_root
+    path.parent.joinpath("profile.json").write_text(
+        json.dumps(profile, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8"
+    )
+    return "profile.json"
+
+
+def setup_work_env(path: Path) -> dict[str, Any]:
+    _work_dir(path.parent / "work", "work:12345678-abcd", "env-only")
+    return {
+        "profile": _profile_with_work_root(path, "mcp-work-env", None),
+        "env": {"TRAJECTA_WORK_ROOT": "work"},
+        "fixture": True,
+    }
+
+
+def setup_work_precedence(path: Path) -> dict[str, Any]:
+    _work_dir(path.parent / "env-work", "work:aaaaaaaa-0001", "from-env")
+    _work_dir(path.parent / "profile-work", "work:bbbbbbbb-0002", "from-profile")
+    return {
+        "profile": _profile_with_work_root(path, "mcp-work-precedence", "profile-work"),
+        "env": {"TRAJECTA_WORK_ROOT": "env-work"},
+        "fixture": True,
+    }
+
+
+def setup_work_blank_env(path: Path) -> dict[str, Any]:
+    state = setup_work_precedence(path)
+    state["env"] = {"TRAJECTA_WORK_ROOT": " \t "}
+    return state
+
+
+def work_env_transcript(_: dict[str, Any]) -> bytes:
+    phase = '{"event_id":"%s","title":"Work","summary":"linked work","work_refs":["%s"]}'
+    return lines(
+        tool(1, "identity_status", "{}"),
+        tool(2, "identity_log_phase", phase % ("with-work", "work:12345678-abcd")),
+        tool(3, "identity_log_phase", phase % ("missing-work", "work:deadbeef-0000")),
+        tool(4, "identity_retrieve", '{"cue":"linked work","track":false}'),
+    )
+
+
+def work_precedence_transcript(_: dict[str, Any]) -> bytes:
+    phase = '{"event_id":"%s","title":"Work","summary":"linked work","work_refs":["%s"]}'
+    return lines(
+        tool(1, "identity_status", "{}"),
+        tool(2, "identity_log_phase", phase % ("env-ref", "work:aaaaaaaa-0001")),
+        tool(3, "identity_log_phase", phase % ("profile-ref", "work:bbbbbbbb-0002")),
+        tool(4, "identity_retrieve", '{"cue":"linked work","track":false}'),
+    )
+
+
 def mutation_error_transcript(_: dict[str, str]) -> bytes:
     return lines(tool(1, "identity_log_phase", '{"event_id":"blocked","title":"Blocked","summary":"Blocked"}'))
 
@@ -435,6 +506,9 @@ SCENARIOS: dict[str, tuple[Setup | None, Transcript]] = {
     "future-store": (lambda path: setup_incompatible(path, future=True), mutation_error_transcript),
     "wal-sidecar": (setup_wal_sidecar, mutation_error_transcript),
     "work-store-error": (setup_work_error, work_error_transcript),
+    "work-env": (setup_work_env, work_env_transcript),
+    "work-env-precedence": (setup_work_precedence, work_precedence_transcript),
+    "work-env-blank": (setup_work_blank_env, work_precedence_transcript),
 }
 
 UNCHANGED_AFTER_CALL = {
@@ -478,7 +552,7 @@ activation.datetime = Micros
     )
 
 
-def run_oracle(work: Path, transcript: bytes, profile: str) -> tuple[bytes, bytes]:
+def run_oracle(work: Path, transcript: bytes, profile: str, extra_env: dict[str, str] | None = None) -> tuple[bytes, bytes]:
     clock = work / "clock"
     clock.mkdir()
     write_sitecustomize(clock / "sitecustomize.py")
@@ -486,6 +560,9 @@ def run_oracle(work: Path, transcript: bytes, profile: str) -> tuple[bytes, byte
     environment["PYTHONPATH"] = os.pathsep.join((str(clock), str(ROOT)))
     environment["TRAJECTA_IDENTITY_DATA_DIR"] = str(work / "data")
     environment["TRAJECTA_IDENTITY_PROFILES"] = str(BUNDLED_PROFILES)
+    # The caller's own work root must never leak into the oracle; scenarios set it explicitly.
+    environment.pop("TRAJECTA_WORK_ROOT", None)
+    environment.update(extra_env or {})
     process = subprocess.Popen(
         [
             sys.executable,
@@ -548,6 +625,10 @@ def generate(output: Path) -> None:
                 state = setup(store) if setup else {}
             profile = state.get("profile", "example")
             transcript = transcript_builder(state)
+            if state.get("fixture"):
+                # Everything the replay needs besides the store: profile, work roots, env.
+                shutil.copytree(work, scenario / "fixture")
+                write_json(scenario / "invocation.json", {"profile": profile, "env": state.get("env", {})})
             (scenario / "transcript.in").write_bytes(transcript)
             initial_bytes = store.read_bytes() if store.exists() else None
             if store.exists():
@@ -556,7 +637,7 @@ def generate(output: Path) -> None:
             initial_sidecar = sidecar.read_bytes() if sidecar.exists() else None
             if sidecar.exists():
                 shutil.copyfile(sidecar, scenario / "initial.sqlite3-wal")
-            expected, stderr = run_oracle(work, transcript, profile)
+            expected, stderr = run_oracle(work, transcript, profile, state.get("env"))
             if stderr:
                 raise AssertionError(f"unexpected oracle stderr for {name}: {stderr.decode(errors='replace')}")
             (scenario / "expected.out").write_bytes(expected)
