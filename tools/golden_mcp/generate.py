@@ -273,6 +273,18 @@ def framing_transcript(_: dict[str, str]) -> bytes:
     )
 
 
+def float_bounds_transcript(_: dict[str, str]) -> bytes:
+    # Overflowing float tokens are a parse error (-32700, id null) before any
+    # request/id validation; the largest finite binary64 value still parses.
+    phase = '{"event_id":"float-max","title":"Float","summary":"bounds","phase_context":{"x":%s}}'
+    return lines(
+        tool(1, "identity_log_phase", phase % "1e400"),
+        request("1e400", "ping"),
+        tool(2, "identity_log_phase", phase % "-1e400"),
+        tool(3, "identity_log_phase", phase % "1.7976931348623157e308"),
+    )
+
+
 def structure_transcript(_: dict[str, str]) -> bytes:
     return lines(
         request("1", "tools/call", "{}"),
@@ -406,6 +418,7 @@ SCENARIOS: dict[str, tuple[Setup | None, Transcript]] = {
     "ids": (None, ids_transcript),
     "framing": (None, framing_transcript),
     "call-structure": (None, structure_transcript),
+    "float-bounds": (None, float_bounds_transcript),
     "validation": (None, validation_transcript),
     "missing-reads": (None, missing_reads_transcript),
     "invalid-mutation": (None, invalid_mutation_transcript),

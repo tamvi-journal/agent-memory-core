@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"float-max","title":"Float","summary":"bounds","phase_context":{"x":1e400}}}}
+{"jsonrpc":"2.0","id":1e400,"method":"ping"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"float-max","title":"Float","summary":"bounds","phase_context":{"x":-1e400}}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"identity_log_phase","arguments":{"event_id":"float-max","title":"Float","summary":"bounds","phase_context":{"x":1.7976931348623157e308}}}}

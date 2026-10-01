@@ -1,0 +1,4 @@
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "Parse error"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "Parse error"}}
+{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "Parse error"}}
+{"jsonrpc": "2.0", "id": 3, "result": {"content": [{"type": "text", "text": "{\"record_id\": \"phase:float-max\", \"status\": \"logged\", \"linked\": {}}"}], "structuredContent": {"record_id": "phase:float-max", "status": "logged", "linked": {}}, "isError": false}}

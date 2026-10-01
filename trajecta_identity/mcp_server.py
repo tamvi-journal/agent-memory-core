@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import math
 import sys
 import traceback
 from pathlib import Path
@@ -283,8 +284,20 @@ def _reject_constant(value: str) -> None:
     raise ValueError(f"invalid JSON constant {value}")
 
 
+def _finite_float(token: str) -> float:
+    """R0 §4.1: NaN and Infinity are never accepted. CPython json turns an
+    overflowing token such as 1e400 into inf; the frozen contract (and the TS
+    parser) treats that frame as a parse error instead."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError(f"non-finite number {token}")
+    return value
+
+
 def loads_lossless(source: str) -> Any:
-    return json.loads(source, parse_int=IntToken, parse_constant=_reject_constant)
+    return json.loads(
+        source, parse_int=IntToken, parse_float=_finite_float, parse_constant=_reject_constant
+    )
 
 
 def wire_dumps(value: Any) -> str:
