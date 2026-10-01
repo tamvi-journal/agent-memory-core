@@ -52,3 +52,10 @@ export class RuntimeError extends Error {
     this.name = "RuntimeError";
   }
 }
+
+export class FileExistsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FileExistsError";
+  }
+}

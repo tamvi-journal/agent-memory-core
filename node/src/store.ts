@@ -12,7 +12,13 @@ import {
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { IncompatibleJournalMode, MigrationRequired, PinnedRecordError, SchemaVersionError } from "./errors.ts";
+import {
+  FileExistsError,
+  IncompatibleJournalMode,
+  MigrationRequired,
+  PinnedRecordError,
+  SchemaVersionError,
+} from "./errors.ts";
 import { hooks } from "./internal-hooks.ts";
 import { createHash } from "node:crypto";
 import { hashPayload, orderedObject, pyJsonDumps, type JsonValue } from "./encoding.ts";
@@ -587,7 +593,7 @@ export class MemoryStore {
     options: { dryRun?: boolean; backupPath?: string } = {},
   ): MemoryStore | Record<string, unknown> {
     this.close();
-    if (existsSync(target)) throw new Error(`migration target exists: ${target}`);
+    if (existsSync(target)) throw new FileExistsError(`migration target exists: ${target}`);
     if (!this.exists()) {
       if (options.dryRun) return { state: "ready", from: "uninitialized", dry_run: true };
       const empty = new MemoryStore(target, { pinnedGuard: [...this.pinnedGuard], now: this.clock });
@@ -600,8 +606,8 @@ export class MemoryStore {
     const version = before.state.slice(-1),
       backup = options.backupPath ?? `${target}.v${version}.bak`,
       work = options.dryRun ? `${target}.dry-${process.pid}` : target;
-    if (options.dryRun && existsSync(work)) throw new Error(`dry-run path exists: ${work}`);
-    if (!options.dryRun && existsSync(backup)) throw new Error(`migration backup exists: ${backup}`);
+    if (options.dryRun && existsSync(work)) throw new FileExistsError(`dry-run path exists: ${work}`);
+    if (!options.dryRun && existsSync(backup)) throw new FileExistsError(`migration backup exists: ${backup}`);
     mkdirSync(dirname(resolve(target)), { recursive: true });
     if (!options.dryRun) copyFileSync(this.path, backup);
     copyFileSync(this.path, work);
