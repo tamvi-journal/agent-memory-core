@@ -9,6 +9,7 @@ import {
   ReceiptIntegrityError,
   ReceiptNotFound,
   StaleAuthority,
+  ValueError,
 } from "./errors.ts";
 import { asArray, asString, get, objectEntries, parseLossless } from "./json.ts";
 import { hooks } from "./internal-hooks.ts";
@@ -81,7 +82,7 @@ function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = fal
     return `{${entries.map(([key, item]) => `${quote(key)}: ${jsonWith(item, null, level, sort)}`).join(", ")}}`;
   return `{\n${entries.map(([key, item]) => `${pad(level + indent)}${quote(key)}: ${jsonWith(item, indent, level + indent, sort)}`).join(",\n")}\n${pad(level)}}`;
 }
-export const pythonIndentedJson = (value: JsonValue): string => jsonWith(value, 1);
+export const pythonIndentedJson = (value: JsonValue, indent = 1): string => jsonWith(value, indent);
 const pythonDefaultJson = (value: JsonValue, sort = false): string => jsonWith(value, null, 0, sort);
 
 function valueFromRow(value: unknown, float = false): JsonValue {
@@ -252,7 +253,7 @@ export class AuthorityV2 {
     if (!terminal.stdinTTY || !terminal.stdoutTTY)
       throw new HumanPresenceRequired("receipt issuance requires interactive TTY stdin and stdout");
     terminal.write?.(`Type ${expected} to issue the owner receipt: `);
-    if (terminal.read().replace(/\r?\n$/u, "") !== expected)
+    if (terminal.read().replace(/\n$/u, "").replace(/\r$/u, "") !== expected)
       throw new ConfirmationMismatch(`confirmation did not exactly match '${expected}'`);
   }
 
@@ -322,9 +323,9 @@ export class AuthorityV2 {
   issueRetract(recordId: string, reason: string, terminal: Terminal): Record<string, unknown> {
     this.store.requireWritable();
     if ((PINNED as readonly string[]).includes(recordId))
-      throw new Error("core, ontology and anchors cannot be retracted");
+      throw new ValueError("core, ontology and anchors cannot be retracted");
     const current = this.store.currentView(recordId)[0];
-    if (!current) throw new Error("current record not found");
+    if (!current) throw new ValueError("current record not found");
     this.requireConfirmation(`RETRACT ${recordId}`, terminal);
     return this.#issue(
       "identity_retract",
@@ -346,7 +347,8 @@ export class AuthorityV2 {
     const relation = this.store.all(
       "SELECT * FROM memory_relation_events_v4 WHERE from_record_id='core' AND to_record_id='anchor:discussions' AND relation_type='awaiting-discussion' ORDER BY sequence_number DESC LIMIT 1",
     )[0];
-    if (!current || !relation || relation.event_type !== "assert") throw new Error("no active legacy core discussion");
+    if (!current || !relation || relation.event_type !== "assert")
+      throw new ValueError("no active legacy core discussion");
     this.requireConfirmation(`CLOSE ${str(relation, "relation_event_id").split(":", 2)[1].slice(0, 12)}`, terminal);
     return this.#issue(
       "identity_legacy_discussion_close",

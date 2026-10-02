@@ -20,7 +20,7 @@ export class PacketRenderer {
   render(
     query: string,
     hits: MemoryHit[],
-    options: { scope: string; surface: string; compact?: boolean; tokenBudget?: number },
+    options: { scope: string; surface: string; compact?: boolean; tokenBudget?: number | bigint },
   ): string {
     const compact = options.compact ?? true;
     const tokenBudget = options.tokenBudget ?? 1800;

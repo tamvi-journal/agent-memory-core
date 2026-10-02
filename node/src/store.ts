@@ -3,6 +3,9 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
+  rmSync,
+  utimesSync,
   openSync,
   readFileSync,
   readSync,
@@ -18,6 +21,7 @@ import {
   MigrationRequired,
   PinnedRecordError,
   SchemaVersionError,
+  ValueError,
 } from "./errors.ts";
 import { hooks } from "./internal-hooks.ts";
 import { createHash } from "node:crypto";
@@ -593,7 +597,7 @@ export class MemoryStore {
     options: { dryRun?: boolean; backupPath?: string } = {},
   ): MemoryStore | Record<string, unknown> {
     this.close();
-    if (existsSync(target)) throw new FileExistsError(`migration target exists: ${target}`);
+    if (existsSync(target)) throw new FileExistsError(target);
     if (!this.exists()) {
       if (options.dryRun) return { state: "ready", from: "uninitialized", dry_run: true };
       const empty = new MemoryStore(target, { pinnedGuard: [...this.pinnedGuard], now: this.clock });
@@ -604,14 +608,23 @@ export class MemoryStore {
     if (!["legacy-v2", "legacy-v3", "legacy-v4"].includes(before.state))
       throw new MigrationRequired(`store state '${before.state}' is not an explicit migration source`);
     const version = before.state.slice(-1),
-      backup = options.backupPath ?? `${target}.v${version}.bak`,
-      work = options.dryRun ? `${target}.dry-${process.pid}` : target;
-    if (options.dryRun && existsSync(work)) throw new FileExistsError(`dry-run path exists: ${work}`);
-    if (!options.dryRun && existsSync(backup)) throw new FileExistsError(`migration backup exists: ${backup}`);
-    mkdirSync(dirname(resolve(target)), { recursive: true });
-    if (!options.dryRun) copyFileSync(this.path, backup);
-    copyFileSync(this.path, work);
+      backup = options.backupPath ?? `${target}.v${version}.bak`;
+    const normcase = (path: string) => (process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path));
+    if (!options.dryRun) {
+      if (normcase(backup) === normcase(target)) throw new ValueError("backup path must differ from target");
+      if (existsSync(backup)) throw new FileExistsError(backup);
+      mkdirSync(dirname(resolve(target)), { recursive: true });
+      const sourceStat = statSync(this.path);
+      copyFileSync(this.path, backup);
+      utimesSync(backup, sourceStat.atime, sourceStat.mtime);
+      // Outside cleanup: an aliased target must never cause backup deletion.
+      if (existsSync(target)) throw new FileExistsError(target);
+    }
+    if (options.dryRun) mkdirSync(dirname(resolve(target)), { recursive: true });
+    const rehearsal = options.dryRun ? mkdtempSync(resolve(dirname(target), "trajecta-migrate-dry-run-")) : null;
+    const work = rehearsal ? resolve(rehearsal, "store.sqlite3") : target;
     try {
+      copyFileSync(this.path, work);
       readHeader(work);
       const database = new DatabaseSync(work, { enableForeignKeyConstraints: true, timeout: 5000 });
       try {
@@ -639,6 +652,8 @@ export class MemoryStore {
     } catch (error) {
       if (existsSync(work)) unlinkSync(work);
       throw error;
+    } finally {
+      if (rehearsal) rmSync(rehearsal, { recursive: true, force: true });
     }
   }
   migrateV4To(target: string, backup: string): MemoryStore {

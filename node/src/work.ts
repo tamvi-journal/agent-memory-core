@@ -79,6 +79,9 @@ export class WorkStore {
     }
     return null;
   }
+  workItems(): Record<string, unknown>[] {
+    return asArray(get(this.state(), "work")).map((item) => this.summarize(object(item)));
+  }
   missing(refs: string[]): string[] {
     return refs.filter((ref) => this.resolve(ref) === null);
   }

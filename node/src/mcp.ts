@@ -137,7 +137,7 @@ function factInput(argumentsValue: OrderedObject): FactInput {
   };
 }
 
-function outputJson(value: unknown, field = ""): JsonValue {
+export function outputJson(value: unknown, field = ""): JsonValue {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "bigint") return pyInt(value);
   if (typeof value === "number") {

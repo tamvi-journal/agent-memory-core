@@ -30,7 +30,11 @@ function object(value: JsonValue | undefined): OrderedObject {
 }
 
 export function loadProfile(path: string): IdentityProfile {
-  const ast = object(parseLossless(readFileSync(path, "utf8")));
+  return profileFromAst(object(parseLossless(readFileSync(path, "utf8"))));
+}
+
+/** Reuse a validated lossless profile without a second filesystem read. */
+export function profileFromAst(ast: OrderedObject): IdentityProfile {
   const name = asString(get(ast, "name"));
   const rawAliases = get(ast, "cue_aliases");
   const cueAliases: CueAlias[] =
