@@ -7,8 +7,8 @@ on:
 
 # Development and smoke commands receive isolated data/profile roots from the first step.
 env:
-  TRAJECTA_IDENTITY_DATA_DIR: ${{ runner.temp }}/identity-data
-  TRAJECTA_IDENTITY_PROFILES: ${{ runner.temp }}/identity-profiles
+  TRAJECTA_IDENTITY_DATA_DIR: ${{ github.workspace }}/.isolation/identity-data
+  TRAJECTA_IDENTITY_PROFILES: ${{ github.workspace }}/.isolation/identity-profiles
 
 jobs:
   node-conformance:
