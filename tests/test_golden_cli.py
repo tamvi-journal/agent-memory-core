@@ -50,11 +50,11 @@ def test_generator_refuses_prefix_boundary(file, suffix):
 @pytest.mark.parametrize("context", ["raw-text", "json-string"])
 def test_template_roundtrip_and_fresh_origin(context):
     raw = b'"/fixture/store.sqlite3 http://127.0.0.1:123/profile.json"'
-    encoded, entries = template(raw, file="stdout", root="/fixture", origin="http://127.0.0.1:123", context=context)
-    expected = render(encoded, entries, file="stdout", root="/fresh", origin="http://127.0.0.1:456")
+    encoded, entries = template(raw, file="stdout", root="/fixture", origin="http://127.0.0.1:123", context=context, separator="/")
+    expected = render(encoded, entries, file="stdout", root="/fresh", origin="http://127.0.0.1:456", separator="/")
     assert expected == b'"/fresh/store.sqlite3 http://127.0.0.1:456/profile.json"'
     assert expected != b'"/freshX/store.sqlite3 http://127.0.0.1:4569/profile.json"'
-    with pytest.raises(ValueError): render(encoded, entries[:-1], file="stdout", root="/fresh", origin="http://127.0.0.1:456")
+    with pytest.raises(ValueError): render(encoded, entries[:-1], file="stdout", root="/fresh", origin="http://127.0.0.1:456", separator="/")
 
 
 def test_windows_json_explicit_context():
