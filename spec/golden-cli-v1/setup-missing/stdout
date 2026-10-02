@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "trajecta-identity-example": {
+      "command": "/usr/local/bin/python",
+      "args": [
+        "-m",
+        "trajecta_identity.mcp_server",
+        "--profile",
+        "example",
+        "--db",
+        "{{ROOT}}/store.sqlite3"
+      ]
+    }
+  }
+}

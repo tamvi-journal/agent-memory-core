@@ -1,0 +1,13 @@
+{
+  "schema": "trajecta-identity-packet/v1",
+  "profile": "example",
+  "cue": "who are you",
+  "memory_decides_truth": false,
+  "open_core_proposals": [],
+  "open_discussions": [],
+  "open_loops": [],
+  "causal_neighbors": [],
+  "items": [],
+  "self_authored_share": 0.0,
+  "packet": "# EXAMPLE AGENT IDENTITY MEMORY\n\nGenerated: 2026-09-30T00:00:00+00:00\nCue: who are you\nScope: global\nSurface: cli\nBudget: 2400 (deterministic-utf8-quarter/v1)\n\n> Memory is evidence and orientation, not authority.\n> Current revisions are shown by default; history is cue-driven.\n\n## Execution instruction\n\nMemory is orientation, not authority. Current input outranks it.\nEarlier phases were true to their conditions; do not refute them.\n"
+}

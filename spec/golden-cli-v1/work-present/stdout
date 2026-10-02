@@ -1,0 +1,19 @@
+{
+  "work_store": "{{ROOT}}/work",
+  "work": [
+    {
+      "ref": "work:12345678-abcd",
+      "kind": "work",
+      "topic": "env-only",
+      "goal": "parity",
+      "status": "active",
+      "revision": 3,
+      "next_action": "replay",
+      "open_loops": [
+        "crash"
+      ],
+      "active_branch": "writers",
+      "updated_at": "2026-09-30T00:00:00Z"
+    }
+  ]
+}

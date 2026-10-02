@@ -1,0 +1,1 @@
+{"schema":"trajecta.state/v1","work":[{"id":"work:aaaaaaaa-0001","topic":"env","goal":"parity","status":"active","revision":3,"nextAction":"replay","openLoops":["crash"],"activeBranchId":"branch:one","branches":[{"id":"branch:one","label":"writers"}],"updatedAt":"2026-09-30T00:00:00Z"}]}

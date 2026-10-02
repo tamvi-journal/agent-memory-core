@@ -1,0 +1,1 @@
+MigrationRequiredError: schema v4 store must be migrated to v5 before writing

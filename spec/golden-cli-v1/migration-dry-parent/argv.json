@@ -1,0 +1,1 @@
+["--db","store.sqlite3","migrate-to","nested/parent/target.sqlite3","--dry-run"]

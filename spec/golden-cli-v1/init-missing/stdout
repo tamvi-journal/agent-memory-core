@@ -1,0 +1,10 @@
+{
+  "profile": "example",
+  "db": "store.sqlite3",
+  "records": {
+    "anchor:discussions": "materialized",
+    "anchor:open-loops": "materialized",
+    "vho-open-ontology-core": "materialized",
+    "core": "materialized"
+  }
+}
