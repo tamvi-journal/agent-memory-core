@@ -17,7 +17,8 @@ import { ValueError } from "./errors.ts";
 import { IdentityMemory, type FactInput, type PhaseInput } from "./identity.ts";
 import { asArray, asString, get, objectEntries, parseLossless } from "./json.ts";
 import { TOOL_BY_NAME, toolsJson, validateArguments } from "./mcp-schema.ts";
-import { loadProfile } from "./profile.ts";
+import { resolveProfile } from "./recipe.ts";
+import { profileDb } from "./paths.ts";
 
 const SUPPORTED = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const NEVER_BOOTSTRAP = new Set([
@@ -458,27 +459,32 @@ function packageVersion(): string {
   return asString(get(object(parseLossless(readFileSync(packagePath, "utf8"))), "version"));
 }
 
-function argumentsFrom(argv: string[]): { profile: string; database: string } {
-  let profile = "";
-  let database = "";
+function argumentsFrom(argv: string[]): { profile?: string; database?: string } {
+  let profile: string | undefined;
+  let database: string | undefined;
   for (let index = 0; index < argv.length; index++) {
-    if (argv[index] === "--profile") profile = argv[++index] ?? "";
-    else if (argv[index] === "--db") database = argv[++index] ?? "";
-    else throw new Error(`unknown argument: ${argv[index]}`);
+    if (argv[index] === "--profile" || argv[index] === "--db") {
+      const option = argv[index];
+      const value = argv[++index];
+      if (value === undefined || value.startsWith("--")) throw new Error(`${option} requires a value`);
+      if (option === "--profile") profile = value;
+      else database = value;
+    } else throw new Error(`unknown argument: ${argv[index]}`);
   }
-  if (!profile || !database) throw new Error("--profile and --db are required");
   return { profile, database };
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const argumentsValue = argumentsFrom(argv);
+  const profile = await resolveProfile(argumentsValue.profile, { env: process.env, rememberChoice: false });
+  const database = argumentsValue.database ?? profileDb(profile.name, process.env);
   const clockStart = process.env.TRAJECTA_IDENTITY_MCP_CLOCK_START;
   // Python WorkStore.from_config: a non-blank $TRAJECTA_WORK_ROOT wins over the
   // profile's work_root; a blank or whitespace-only value falls back to the profile.
   const envWorkRoot = process.env.TRAJECTA_WORK_ROOT?.trim();
-  const memory = new IdentityMemory(loadProfile(argumentsValue.profile), argumentsValue.database, {
+  const memory = new IdentityMemory(profile, database, {
     surface: "mcp",
-    displayDatabase: argumentsValue.database,
+    displayDatabase: database,
     ...(clockStart ? { clock: new InjectedClock(clockStart) } : {}),
     ...(envWorkRoot ? { workRoot: envWorkRoot } : {}),
   });

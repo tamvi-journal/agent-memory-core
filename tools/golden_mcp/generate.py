@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 from memory_core import MemoryStore  # noqa: E402
 from tools.golden.generate import clock_context, dump_database  # noqa: E402
 from trajecta_identity import IdentityMemory, load_profile  # noqa: E402
+from trajecta_identity.paths import profile_db, safe_fs_name  # noqa: E402
 
 ORACLE_COMMIT = "2916d15ba11508f7e5155568ff281cfdb30cb3fd"
 ORACLE_SEMANTICS = [
@@ -552,17 +553,65 @@ activation.datetime = Micros
     )
 
 
+def assert_contained(work: Path, path: Path) -> None:
+    target = path if path.is_absolute() else work / path
+    if not target.resolve().is_relative_to(work.resolve()):
+        raise AssertionError("writable path escapes MCP fixture")
+
+
+def isolated_environment(work: Path, clock: Path, extra: dict[str, str] | None = None) -> dict[str, str]:
+    environment = {
+        "PATH": os.defpath,
+        "PYTHONPATH": os.pathsep.join((str(clock), str(ROOT))),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": os.environ.get("PYTHONHASHSEED", "0"),
+    }
+    if sys.platform == "win32":
+        for key in ("SYSTEMROOT", "COMSPEC"):
+            if key in os.environ:
+                environment[key] = os.environ[key]
+    for key, value in (extra or {}).items():
+        if key != "TRAJECTA_WORK_ROOT":
+            raise AssertionError(f"unapproved child env: {key}")
+        environment[key] = value
+    for key, directory in {
+        "HOME": "home", "USERPROFILE": "home", "XDG_DATA_HOME": "xdg",
+        "LOCALAPPDATA": "local", "APPDATA": "app",
+        "TRAJECTA_IDENTITY_DATA_DIR": "data", "TRAJECTA_IDENTITY_PROFILES": "profiles",
+        "TMPDIR": "tmp", "TMP": "tmp", "TEMP": "tmp",
+    }.items():
+        path = work / directory
+        assert_contained(work, path)
+        path.mkdir(parents=True, exist_ok=True)
+        environment[key] = str(path)
+    shutil.copytree(BUNDLED_PROFILES, Path(environment["TRAJECTA_IDENTITY_PROFILES"]), dirs_exist_ok=True)
+    return environment
+
+
+def assert_startup_paths(work: Path, environment: dict[str, str], profile: str, database: str) -> None:
+    path = Path(profile)
+    if not path.is_absolute():
+        path = work / path
+    manifest = path if path.suffix == ".json" else path / "profile.json"
+    if not manifest.is_file():
+        manifest = Path(environment["TRAJECTA_IDENTITY_PROFILES"]) / profile / "profile.json"
+    name = json.loads(manifest.read_text(encoding="utf-8"))["name"]
+    assert_contained(work, Path(database))
+    assert_contained(work, profile_db(name, env=environment))
+    data = Path(environment["TRAJECTA_IDENTITY_DATA_DIR"])
+    assert_contained(work, data / "profiles" / safe_fs_name(name))
+    assert_contained(work, data / "profiles" / safe_fs_name(name) / "profile.json")
+    assert_contained(work, data / ".last-profile")
+    if environment.get("TRAJECTA_WORK_ROOT", "").strip():
+        assert_contained(work, Path(environment["TRAJECTA_WORK_ROOT"].strip()))
+
+
 def run_oracle(work: Path, transcript: bytes, profile: str, extra_env: dict[str, str] | None = None) -> tuple[bytes, bytes]:
     clock = work / "clock"
     clock.mkdir()
     write_sitecustomize(clock / "sitecustomize.py")
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join((str(clock), str(ROOT)))
-    environment["TRAJECTA_IDENTITY_DATA_DIR"] = str(work / "data")
-    environment["TRAJECTA_IDENTITY_PROFILES"] = str(BUNDLED_PROFILES)
-    # The caller's own work root must never leak into the oracle; scenarios set it explicitly.
-    environment.pop("TRAJECTA_WORK_ROOT", None)
-    environment.update(extra_env or {})
+    environment = isolated_environment(work, clock, extra_env)
+    assert_startup_paths(work, environment, profile, "store.sqlite3")
     process = subprocess.Popen(
         [
             sys.executable,
