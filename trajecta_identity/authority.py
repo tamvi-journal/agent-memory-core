@@ -51,7 +51,10 @@ def require_confirmation(
         )
     stdout.write(f"Type {expected} to issue the owner receipt: ")
     stdout.flush()
-    actual = stdin.readline()
+    try:
+        actual = stdin.readline()
+    except UnicodeDecodeError as exc:
+        raise ConfirmationMismatch("confirmation input was not valid UTF-8") from exc
     if actual.endswith("\n"):
         actual = actual[:-1]
     if actual.endswith("\r"):

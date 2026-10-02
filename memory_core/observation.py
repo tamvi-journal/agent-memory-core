@@ -9,6 +9,11 @@ from .store import SCHEMA_VERSION, MemoryStore
 
 def validate_store(store: MemoryStore) -> dict[str, Any]:
     store.initialize()
+    return _ready_checks(store)
+
+
+def _ready_checks(store: MemoryStore) -> dict[str, Any]:
+    """The legacy seven checks, without initialization or migration."""
     with store.connect(readonly=True) as conn:
         integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
         foreign_keys = [
@@ -84,3 +89,21 @@ def evaluate_cue_contract(
         "passed": all(item["passed"] for item in results),
         "cases": results,
     }
+
+
+def doctor(store: MemoryStore) -> dict[str, Any]:
+    """Non-initializing CLI diagnostic; profile resolution is a separate surface."""
+    state = store.schema_info()["state"]
+    result = {"schema": "memory-core-doctor/v2", "state": state, "passed": False}
+    if state == "uninitialized":
+        result.update(state="missing", action="init")
+    elif state.startswith("legacy-v"):
+        result["action"] = "migrate-to"
+    elif state == "incompatible":
+        with store.connect(readonly=True):
+            pass  # schema assertion raises the existing typed error
+    elif state == "ready":
+        checks = _ready_checks(store)
+        result.update(passed=checks["passed"], checks=checks["checks"],
+                      foreign_key_errors=checks["foreign_key_errors"])
+    return result
