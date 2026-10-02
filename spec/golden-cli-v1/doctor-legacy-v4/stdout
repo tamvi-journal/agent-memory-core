@@ -1,0 +1,6 @@
+{
+  "schema": "memory-core-doctor/v2",
+  "state": "legacy-v4",
+  "passed": false,
+  "action": "migrate-to"
+}

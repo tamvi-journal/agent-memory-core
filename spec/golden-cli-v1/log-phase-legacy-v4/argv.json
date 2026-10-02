@@ -1,0 +1,1 @@
+["--db","store.sqlite3","log-phase","cli-phase","--title","Phase","--summary","CLI phase","--open-loop"]

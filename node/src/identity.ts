@@ -72,7 +72,7 @@ function coreContent(value: any): string {
     ]),
   );
 }
-function validateCore(value: any): string[] {
+export function validateCore(value: any): string[] {
   const errors: string[] = [];
   for (const k of ["title", "summary", "falsifier"])
     if (!asString(get(value, k)).trim()) errors.push(`core.${k} is required`);
@@ -437,7 +437,7 @@ export class IdentityMemory {
   }
   retrieve(
     cue: string,
-    options: { limit?: number; tokenBudget?: number; includeHistory?: boolean | null; track?: boolean } = {},
+    options: { limit?: number; tokenBudget?: number | bigint; includeHistory?: boolean | null; track?: boolean } = {},
   ): Record<string, unknown> {
     const limit = options.limit ?? 10,
       tokenBudget = options.tokenBudget ?? 2400;
@@ -447,7 +447,7 @@ export class IdentityMemory {
     if (this.store.schemaInfo().state !== "ready") track = false;
     const hits = this.retriever.retrieve(cue, {
       limit,
-      tokenBudget: Math.max(tokenBudget * 8, 20000),
+      tokenBudget: Math.max(Number(tokenBudget) * 8, 20000),
       includeHistory: options.includeHistory,
       minAccessibility: this.activation.dormantBelow,
       wakeRelationTypes: CAUSAL_RELATIONS,

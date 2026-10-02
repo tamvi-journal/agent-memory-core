@@ -1,0 +1,22 @@
+{
+  "schema": "trajecta-identity-status/v1",
+  "profile": "example",
+  "agent": "example-agent",
+  "db": "store.sqlite3",
+  "store": "legacy-v4",
+  "write_policy": "self-authored proposals; owner receipt controls canonical core",
+  "records": {
+    "core": 1,
+    "fact": 1,
+    "ontology": 1,
+    "phase": 3
+  },
+  "activation": {
+    "pinned": 2,
+    "active": 4
+  },
+  "open_discussions": 1,
+  "open_core_proposals": 0,
+  "open_loops": 1,
+  "work_store": null
+}

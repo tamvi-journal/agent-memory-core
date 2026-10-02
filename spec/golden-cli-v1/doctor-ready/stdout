@@ -1,0 +1,15 @@
+{
+  "schema": "memory-core-doctor/v2",
+  "state": "ready",
+  "passed": true,
+  "checks": {
+    "integrity_ok": true,
+    "foreign_keys_ok": true,
+    "one_current_revision_per_record": true,
+    "no_orphan_current_revision": true,
+    "relations_carried_to_event_stream": true,
+    "schema_application_id": true,
+    "schema_version_current": true
+  },
+  "foreign_key_errors": []
+}

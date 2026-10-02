@@ -5,7 +5,18 @@ import json
 import sys
 from pathlib import Path
 
+from memory_core import SchemaVersionError
+from memory_core.store import PinnedRecordError
+from .authority import (HumanPresenceRequired, ConfirmationMismatch, ReceiptNotFound,
+                        ReceiptIntegrityError, ProposalIntegrityError, ProposalDecided,
+                        StaleAuthority)
+from .work import WorkStoreError
 from .identity import IdentityMemory
+
+PUBLIC_ERRORS = (HumanPresenceRequired, ConfirmationMismatch, ReceiptNotFound,
+                 ReceiptIntegrityError, ProposalIntegrityError, ProposalDecided,
+                 StaleAuthority, SchemaVersionError, PinnedRecordError,
+                 WorkStoreError, FileExistsError, ValueError)
 from .paths import utf8_stdio
 from .paths import profile_search_dirs
 from .recipe import resolve
@@ -77,6 +88,7 @@ def parser() -> argparse.ArgumentParser:
     view.add_argument("--port", type=int, default=8767)
     view.add_argument("--no-browser", action="store_true")
     commands.add_parser("status")
+    commands.add_parser("doctor", help="inspect the store without initializing it")
     retrieve = commands.add_parser("retrieve")
     retrieve.add_argument("cue")
     retrieve.add_argument("--limit", type=int, default=10)
@@ -148,6 +160,14 @@ def _settle(receipt: dict, issue_only: bool, consume) -> dict:
 def main(argv: list[str] | None = None) -> None:
     utf8_stdio()
     args = parser().parse_args(argv)
+    try:
+        _execute(args)
+    except PUBLIC_ERRORS as exc:
+        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
+def _execute(args) -> None:
     command = args.command
     if command == "profiles":
         print(json.dumps({"profiles": list_profiles()}, ensure_ascii=False, indent=2))
@@ -163,7 +183,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
-    profile = resolve(args.profile)
+    profile = resolve(args.profile, remember_choice=command != "doctor")
     memory = IdentityMemory(profile, args.db, surface="cli")
     if command == "init":
         result = memory.bootstrap()
@@ -189,6 +209,13 @@ def main(argv: list[str] | None = None) -> None:
             "(Claude Desktop: Settings → Developer → Edit Config).",
             file=sys.stderr,
         )
+        return
+    elif command == "doctor":
+        from memory_core.observation import doctor
+        result = doctor(memory.store)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if not result["passed"]:
+            raise SystemExit(1)
         return
     elif command == "status":
         result = memory.status()

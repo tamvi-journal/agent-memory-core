@@ -1,0 +1,28 @@
+{
+  "schema": "memory-core-doctor/v2",
+  "state": "ready",
+  "passed": false,
+  "checks": {
+    "integrity_ok": true,
+    "foreign_keys_ok": false,
+    "one_current_revision_per_record": true,
+    "no_orphan_current_revision": true,
+    "relations_carried_to_event_stream": true,
+    "schema_application_id": true,
+    "schema_version_current": true
+  },
+  "foreign_key_errors": [
+    {
+      "table": "memory_revision_evidence_v3",
+      "rowid": 5,
+      "parent": "memory_evidence_v3",
+      "fkid": 0
+    },
+    {
+      "table": "memory_revision_evidence_v3",
+      "rowid": 5,
+      "parent": "memory_revisions_v3",
+      "fkid": 1
+    }
+  ]
+}

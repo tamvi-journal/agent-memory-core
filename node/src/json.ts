@@ -1,15 +1,25 @@
 import { orderedObject, type JsonValue, type OrderedObject, type PyFloat, type PyInt } from "./encoding.ts";
 
-export function parseLossless(source: string, options: { allowLoneSurrogates?: boolean } = {}): JsonValue {
+export function parseLossless(
+  source: string,
+  options: {
+    allowLoneSurrogates?: boolean;
+    allowNonFinite?: boolean;
+    parseInteger?: (text: string) => PyInt;
+    pythonError?: (message: string, offset: number) => never;
+  } = {},
+): JsonValue {
   let offset = 0;
-  const fail = (message: string): never => {
+  const fail = (message: string, pythonMessage = "Expecting value", at = offset): never => {
+    if (options.pythonError) return options.pythonError(pythonMessage, at);
     throw new SyntaxError(`${message} at ${offset}`);
   };
   const whitespace = () => {
     while (" \t\n\r".includes(source[offset] ?? "\0")) offset++;
   };
   const string = (): string => {
-    if (source[offset++] !== '"') fail("expected string");
+    const start = offset;
+    if (source[offset++] !== '"') fail("expected string", "Expecting property name enclosed in double quotes", start);
     let result = "";
     while (offset < source.length) {
       const char = source[offset++];
@@ -26,10 +36,12 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
         return result;
       }
       if (char !== "\\") {
-        if (char.charCodeAt(0) <= 0x1f) fail("unescaped control character");
+        if (char.charCodeAt(0) <= 0x1f) fail("unescaped control character", "Invalid control character at", offset - 1);
         result += char;
         continue;
       }
+      if (offset === source.length && options.pythonError)
+        fail("unterminated string", "Unterminated string starting at", start);
       const escape = source[offset++];
       const short: Record<string, string> = {
         '"': '"',
@@ -43,13 +55,36 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
       };
       if (escape in short) result += short[escape];
       else if (escape === "u") {
-        const hex = source.slice(offset, offset + 4);
-        if (!/^[0-9a-fA-F]{4}$/.test(hex)) fail("invalid unicode escape");
-        result += String.fromCharCode(Number.parseInt(hex, 16));
+        const decodeHex = (uIndex: number): number => {
+          const end = uIndex + 5;
+          const hex = source.slice(uIndex + 1, end);
+          // CPython 3.11 scanstring requires a character after the four digits.
+          if ((options.pythonError && end >= source.length) || !/^[0-9a-fA-F]{4}$/.test(hex))
+            fail("invalid unicode escape", "Invalid \\uXXXX escape", uIndex);
+          return Number.parseInt(hex, 16);
+        };
+        const unit = decodeHex(offset - 1);
+        result += String.fromCharCode(unit);
         offset += 4;
-      } else fail("invalid escape");
+        // CPython only looks ahead at a second complete escape with a following character.
+        // Fourteen UTF-16 units cover the seven source code points needed by that bound.
+        // A non-low surrogate is left for the next scanner iteration.
+        if (
+          options.pythonError &&
+          unit >= 0xd800 &&
+          unit <= 0xdbff &&
+          Array.from(source.slice(offset, offset + 14)).length > 6 &&
+          source.slice(offset, offset + 2) === "\\u"
+        ) {
+          const second = decodeHex(offset + 1);
+          if (second >= 0xdc00 && second <= 0xdfff) {
+            result += String.fromCharCode(second);
+            offset += 6;
+          }
+        }
+      } else fail("invalid escape", "Invalid \\escape", offset - 2);
     }
-    return fail("unterminated string");
+    return fail("unterminated string", "Unterminated string starting at", start);
   };
   const number = (): PyInt | PyFloat => {
     const match = source.slice(offset).match(/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/);
@@ -57,10 +92,10 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
     offset += match[0].length;
     if (/[.eE]/.test(match[0])) {
       const parsed = Number(match[0]);
-      if (!Number.isFinite(parsed)) fail("non-finite number");
+      if (!Number.isFinite(parsed) && !options.allowNonFinite) fail("non-finite number");
       return { kind: "float", value: parsed, text: match[0] };
     }
-    return { kind: "int", value: BigInt(match[0]), text: match[0] };
+    return options.parseInteger?.(match[0]) ?? { kind: "int", value: BigInt(match[0]), text: match[0] };
   };
   const value = (): JsonValue => {
     whitespace();
@@ -81,7 +116,7 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
           offset++;
           return result;
         }
-        if (source[offset++] !== ",") fail("expected comma");
+        if (source[offset++] !== ",") fail("expected comma", "Expecting ',' delimiter", offset - 1);
       }
     }
     if (char === "{") {
@@ -96,7 +131,7 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
         whitespace();
         const key = string();
         whitespace();
-        if (source[offset++] !== ":") fail("expected colon");
+        if (source[offset++] !== ":") fail("expected colon", "Expecting ':' delimiter", offset - 1);
         // Python json: a repeated key keeps its first position and takes the last value.
         const item = value();
         const existing = entries.findIndex(([name]) => name === key);
@@ -107,7 +142,7 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
           offset++;
           return orderedObject(entries);
         }
-        if (source[offset++] !== ",") fail("expected comma");
+        if (source[offset++] !== ",") fail("expected comma", "Expecting ',' delimiter", offset - 1);
       }
     }
     if (source.startsWith("true", offset)) {
@@ -122,11 +157,21 @@ export function parseLossless(source: string, options: { allowLoneSurrogates?: b
       offset += 4;
       return null;
     }
+    if (options.allowNonFinite)
+      for (const [text, constant] of [
+        ["NaN", NaN],
+        ["Infinity", Infinity],
+        ["-Infinity", -Infinity],
+      ] as const)
+        if (source.startsWith(text, offset)) {
+          offset += text.length;
+          return { kind: "float", value: constant, text };
+        }
     return number();
   };
   const result = value();
   whitespace();
-  if (offset !== source.length) fail("trailing input");
+  if (offset !== source.length) fail("trailing input", "Extra data");
   return result;
 }
 

@@ -1,0 +1,20 @@
+Type REJECT f1807fd01f94 to issue the owner receipt: {
+  "operation_id": "operation:6ce11db43a942b64fd216fcd8a0b20fb",
+  "operation_type": "identity_core_revision",
+  "actor": "the owner",
+  "surface": "cli",
+  "target_record_id": "core",
+  "target_revision_id": null,
+  "decision": "materialized",
+  "reason": "reject",
+  "idempotency_key": "authority-v2:receipt:6e42fd53fa2dde75b5363ab3f64a4125",
+  "created_at": "2026-09-30T00:00:01+00:00",
+  "evidence_ids": [],
+  "details": {
+    "decision_note": "",
+    "outcome": "reject",
+    "proposal_id": "core-proposal:f1807fd01f9475071bc1dea03ae988f8",
+    "receipt_id": "receipt:6e42fd53fa2dde75b5363ab3f64a4125"
+  },
+  "revision": null
+}

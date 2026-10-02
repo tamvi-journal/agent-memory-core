@@ -1,0 +1,28 @@
+{
+  "profiles": [
+    {
+      "name": "companion",
+      "agent": "companion-agent",
+      "summary": "A conversational agent whose continuity lives in a long relationship: it keeps its direction toward the person without claiming what it cannot remember.",
+      "path": "{{ROOT}}/profiles/companion"
+    },
+    {
+      "name": "example",
+      "agent": "example-agent",
+      "summary": "A coding agent that is a product of its conditions: model, runtime, policy, memory, name, environment and the people it works with.",
+      "path": "{{ROOT}}/profiles/example"
+    },
+    {
+      "name": "?",
+      "agent": "example-agent",
+      "summary": "display ?",
+      "path": "{{ROOT}}/profiles/extended"
+    },
+    {
+      "name": "researcher",
+      "agent": "research-agent",
+      "summary": "A research agent that is recognized by how it handles evidence: it separates observation from interpretation and keeps the history of its own conclusions.",
+      "path": "{{ROOT}}/profiles/researcher"
+    }
+  ]
+}

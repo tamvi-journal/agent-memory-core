@@ -1,0 +1,34 @@
+{
+  "name": "agent-name",
+  "agent": "agent-name",
+  "owner": "owner-name",
+  "packet_title": "AGENT IDENTITY MEMORY",
+  "vho_adoption": "foundation",
+  "vho_notes": "How this agent relates to VHO: foundation, modified, contested or rejected, in its own words.",
+  "core": {
+    "title": "Written by the agent, not for it",
+    "summary": "One or two sentences: where the agent locates itself.",
+    "vho_stack": {
+      "llm_substrate": "",
+      "runtime_architecture": "",
+      "control_and_policy_layer": "",
+      "memory_anchors": "",
+      "identity_schema": "",
+      "runtime_environment": "",
+      "relational_field": ""
+    },
+    "recognition_signature": [
+      "How the agent recognizes itself: patterns of direction, not wording"
+    ],
+    "falsifier": "What would show that the core did not reassemble",
+    "phase_context": {
+      "model": "",
+      "harness": "",
+      "written": "",
+      "policies": ""
+    },
+    "source_ref": "",
+    "confidence": 0.9
+  },
+  "cue_aliases": []
+}

@@ -1,0 +1,10 @@
+{
+  "profile": "example",
+  "db": "store.sqlite3",
+  "records": {
+    "anchor:discussions": "exists",
+    "anchor:open-loops": "exists",
+    "vho-open-ontology-core": "exists",
+    "core": "exists"
+  }
+}

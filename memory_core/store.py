@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -431,16 +432,21 @@ class MemoryStore:
                     "dry_run": True,
                 }
 
-        target.parent.mkdir(parents=True, exist_ok=True)
         source_version = before["state"].rsplit("v", 1)[1]
         backup = (
             Path(backup_path)
             if backup_path is not None
             else target.with_name(f"{target.name}.v{source_version}.bak")
         )
+        if os.path.normcase(os.path.abspath(backup)) == os.path.normcase(os.path.abspath(target)):
+            raise ValueError("backup path must differ from target")
         if backup.exists():
             raise FileExistsError(backup)
+        target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(self.db_path, backup)
+        # Outside cleanup: target may alias the durable backup through its parent.
+        if target.exists():
+            raise FileExistsError(target)
         try:
             return migrate_copy(target)
         except Exception:

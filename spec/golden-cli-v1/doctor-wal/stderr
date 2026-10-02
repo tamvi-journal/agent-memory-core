@@ -1,0 +1,1 @@
+IncompatibleJournalMode: SQLite WAL sidecar present. Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'

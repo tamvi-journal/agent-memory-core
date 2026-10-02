@@ -1,0 +1,25 @@
+{
+  "timeline": [
+    {
+      "record_id": "phase:third",
+      "at": "2026-09-30T00:00:47+00:00",
+      "title": "Third phase",
+      "summary": "Chain continues",
+      "state": "active"
+    },
+    {
+      "record_id": "phase:second",
+      "at": "2026-09-30T00:00:38+00:00",
+      "title": "Second phase",
+      "summary": "A cause followed",
+      "state": "active"
+    },
+    {
+      "record_id": "phase:first",
+      "at": "2026-09-30T00:00:30+00:00",
+      "title": "First phase",
+      "summary": "First light",
+      "state": "active"
+    }
+  ]
+}

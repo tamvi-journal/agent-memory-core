@@ -1,0 +1,19 @@
+{
+  "work_store": "{{ROOT}}/env-work",
+  "work": [
+    {
+      "ref": "work:aaaaaaaa-0001",
+      "kind": "work",
+      "topic": "env",
+      "goal": "parity",
+      "status": "active",
+      "revision": 3,
+      "next_action": "replay",
+      "open_loops": [
+        "crash"
+      ],
+      "active_branch": "writers",
+      "updated_at": "2026-09-30T00:00:00Z"
+    }
+  ]
+}

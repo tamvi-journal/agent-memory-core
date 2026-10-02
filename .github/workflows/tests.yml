@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Development and smoke commands receive isolated data/profile roots from the first step.
+env:
+  TRAJECTA_IDENTITY_DATA_DIR: ${{ github.workspace }}/.isolation/identity-data
+  TRAJECTA_IDENTITY_PROFILES: ${{ github.workspace }}/.isolation/identity-profiles
+
 jobs:
   node-conformance:
     name: ${{ matrix.os }} / node22 / read and write conformance
@@ -108,4 +113,25 @@ jobs:
             output="$(mktemp -d)/golden-mcp-v1"
             PYTHONHASHSEED="$seed" python tools/golden_mcp/generate.py --output "$output"
             diff -ru spec/golden-mcp-v1 "$output"
+          done
+
+  cli-corpus:
+    name: ubuntu / py3.11 / CLI v1 corpus
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11.15-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and verify frozen CLI tables
+        run: |
+          python -m pip install -e ".[test]"
+          python -m pytest -q tests/test_golden_cli.py tests/test_cli_r2d.py
+      - name: Regenerate CLI v1 under three hash seeds
+        run: |
+          set -eu
+          mkdir -p .isolation/ci
+          for seed in 0 1 4294967295; do
+            output="$(mktemp -d .isolation/ci/cli-XXXXXX)/golden-cli-v1"
+            PYTHONHASHSEED="$seed" python tools/golden_cli/generate.py --output "$output"
+            diff -ru spec/golden-cli-v1 "$output"
           done

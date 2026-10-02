@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { canonicalJson, hashPayload, orderedObject, pyFloat, type JsonValue, type OrderedObject } from "./encoding.ts";
+import {
+  canonicalJson,
+  hashPayload,
+  orderedObject,
+  pyFloat,
+  pythonJsonQuote,
+  type JsonValue,
+  type OrderedObject,
+} from "./encoding.ts";
 import {
   ConfirmationMismatch,
   HumanPresenceRequired,
@@ -9,6 +17,7 @@ import {
   ReceiptIntegrityError,
   ReceiptNotFound,
   StaleAuthority,
+  ValueError,
 } from "./errors.ts";
 import { asArray, asString, get, objectEntries, parseLossless } from "./json.ts";
 import { hooks } from "./internal-hooks.ts";
@@ -51,7 +60,17 @@ const str = (row: Row, key: string): string => String(row[key] ?? "");
 function quote(value: string): string {
   return canonicalJson(value);
 }
-function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = false): string {
+function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = false, profile = false): string {
+  if (profile && typeof value === "string") return pythonJsonQuote(value);
+  if (
+    profile &&
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    value.kind === "float" &&
+    !Number.isFinite(value.value)
+  )
+    return Number.isNaN(value.value) ? "NaN" : value.value < 0 ? "-Infinity" : "Infinity";
   if (
     value === null ||
     typeof value === "boolean" ||
@@ -63,8 +82,9 @@ function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = fal
   const pad = (n: number) => " ".repeat(n);
   if (Array.isArray(value)) {
     if (!value.length) return "[]";
-    if (indent === null) return `[${value.map((item) => jsonWith(item, null, level, sort)).join(", ")}]`;
-    return `[\n${value.map((item) => `${pad(level + indent)}${jsonWith(item, indent, level + indent, sort)}`).join(",\n")}\n${pad(level)}]`;
+    if (indent === null) return `[${value.map((item) => jsonWith(item, null, level, sort, profile)).join(", ")}]`;
+    const lines = value.map((item) => `${pad(level + indent)}${jsonWith(item, indent, level + indent, sort, profile)}`);
+    return `[\n${lines.join(",\n")}\n${pad(level)}]`;
   }
   let entries = value.entries;
   if (sort) entries = [...entries].sort(([a], [b]) => Array.from(a).join("").localeCompare(Array.from(b).join("")));
@@ -77,11 +97,19 @@ function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = fal
       return left.length - right.length;
     });
   if (!entries.length) return "{}";
-  if (indent === null)
-    return `{${entries.map(([key, item]) => `${quote(key)}: ${jsonWith(item, null, level, sort)}`).join(", ")}}`;
-  return `{\n${entries.map(([key, item]) => `${pad(level + indent)}${quote(key)}: ${jsonWith(item, indent, level + indent, sort)}`).join(",\n")}\n${pad(level)}}`;
+  const keyQuote = profile ? pythonJsonQuote : quote;
+  if (indent === null) {
+    const fields = entries.map(([key, item]) => `${keyQuote(key)}: ${jsonWith(item, null, level, sort, profile)}`);
+    return `{${fields.join(", ")}}`;
+  }
+  const lines = entries.map(([key, item]) => {
+    const rendered = jsonWith(item, indent, level + indent, sort, profile);
+    return `${pad(level + indent)}${keyQuote(key)}: ${rendered}`;
+  });
+  return `{\n${lines.join(",\n")}\n${pad(level)}}`;
 }
-export const pythonIndentedJson = (value: JsonValue): string => jsonWith(value, 1);
+export const pythonIndentedJson = (value: JsonValue, indent = 1, profile = false): string =>
+  jsonWith(value, indent, 0, false, profile);
 const pythonDefaultJson = (value: JsonValue, sort = false): string => jsonWith(value, null, 0, sort);
 
 function valueFromRow(value: unknown, float = false): JsonValue {
@@ -252,7 +280,7 @@ export class AuthorityV2 {
     if (!terminal.stdinTTY || !terminal.stdoutTTY)
       throw new HumanPresenceRequired("receipt issuance requires interactive TTY stdin and stdout");
     terminal.write?.(`Type ${expected} to issue the owner receipt: `);
-    if (terminal.read().replace(/\r?\n$/u, "") !== expected)
+    if (terminal.read().replace(/\n$/u, "").replace(/\r$/u, "") !== expected)
       throw new ConfirmationMismatch(`confirmation did not exactly match '${expected}'`);
   }
 
@@ -322,9 +350,9 @@ export class AuthorityV2 {
   issueRetract(recordId: string, reason: string, terminal: Terminal): Record<string, unknown> {
     this.store.requireWritable();
     if ((PINNED as readonly string[]).includes(recordId))
-      throw new Error("core, ontology and anchors cannot be retracted");
+      throw new ValueError("core, ontology and anchors cannot be retracted");
     const current = this.store.currentView(recordId)[0];
-    if (!current) throw new Error("current record not found");
+    if (!current) throw new ValueError("current record not found");
     this.requireConfirmation(`RETRACT ${recordId}`, terminal);
     return this.#issue(
       "identity_retract",
@@ -346,7 +374,8 @@ export class AuthorityV2 {
     const relation = this.store.all(
       "SELECT * FROM memory_relation_events_v4 WHERE from_record_id='core' AND to_record_id='anchor:discussions' AND relation_type='awaiting-discussion' ORDER BY sequence_number DESC LIMIT 1",
     )[0];
-    if (!current || !relation || relation.event_type !== "assert") throw new Error("no active legacy core discussion");
+    if (!current || !relation || relation.event_type !== "assert")
+      throw new ValueError("no active legacy core discussion");
     this.requireConfirmation(`CLOSE ${str(relation, "relation_event_id").split(":", 2)[1].slice(0, 12)}`, terminal);
     return this.#issue(
       "identity_legacy_discussion_close",

@@ -105,8 +105,8 @@ function rejectSurrogates(value: string): void {
   }
 }
 
-function quote(value: string): string {
-  rejectSurrogates(value);
+function quote(value: string, allowSurrogates = false): string {
+  if (!allowSurrogates) rejectSurrogates(value);
   let result = '"';
   for (const char of value) {
     const cp = char.codePointAt(0)!;
@@ -122,6 +122,9 @@ function quote(value: string): string {
   }
   return result + '"';
 }
+
+/** Python ensure_ascii=False quoting, before a later strict encode/hash boundary. */
+export const pythonJsonQuote = (value: string): string => quote(value, true);
 
 export function canonicalJson(value: JsonValue, sortKeys = true): string {
   if (value === null) return "null";

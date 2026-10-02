@@ -1,0 +1,1 @@
+["--db","store.sqlite3","log-fact","cli-fact","--title","Fact","--summary","CLI fact"]

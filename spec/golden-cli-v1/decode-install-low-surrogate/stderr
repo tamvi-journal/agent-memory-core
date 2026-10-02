@@ -1,0 +1,1 @@
+UnicodeEncodeError: 'utf-8' codec can't encode character '\udfff' in position 13: surrogates not allowed

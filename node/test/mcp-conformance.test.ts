@@ -9,7 +9,9 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -17,6 +19,8 @@ import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { createServer } from "node:http";
+import { profileDb } from "../src/paths.ts";
 import {
   FileExistsError,
   IdentityMemory,
@@ -34,6 +38,7 @@ import {
 } from "../src/index.ts";
 import { McpServer, processFrame } from "../src/mcp.ts";
 import { validateArguments } from "../src/mcp-schema.ts";
+import { assertMcpPaths, isolatedMcpEnv, profileNameFor } from "./mcp/isolation.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GOLDEN = resolve(ROOT, "spec", "golden-mcp-v1");
@@ -101,7 +106,7 @@ function dumpDatabase(path: string): any {
 }
 
 function workspace(t: { after(callback: () => void): void }, label: string): string {
-  const path = mkdtempSync(resolve(ROOT, `.mcp-${label}-`));
+  const path = realpathSync.native(mkdtempSync(resolve(ROOT, `.mcp-${label}-`)));
   t.after(() => rmSync(path, { recursive: true, force: true }));
   return path;
 }
@@ -125,8 +130,12 @@ function runMcp(
   transcript: Buffer,
   extraEnv: Record<string, string> = {},
 ): Promise<{ stdout: Buffer; stderr: Buffer; code: number }> {
-  // The runner's own work root must never leak in; scenarios set it explicitly (as the oracle does).
-  const { TRAJECTA_WORK_ROOT: _ignored, ...inherited } = process.env;
+  const env = isolatedMcpEnv(directory, {
+    TRAJECTA_IDENTITY_MCP_CLOCK_START: "2026-09-30T00:00:00.000000+00:00",
+    ...extraEnv,
+  });
+  if (profile === PROFILE) profile = resolve(env.TRAJECTA_IDENTITY_PROFILES, "example/profile.json");
+  assertMcpPaths(directory, env, profileNameFor(directory, profile, env), "store.sqlite3");
   return new Promise((done, reject) => {
     const child = spawn(
       process.execPath,
@@ -141,7 +150,7 @@ function runMcp(
       ],
       {
         cwd: directory,
-        env: { ...inherited, TRAJECTA_IDENTITY_MCP_CLOCK_START: "2026-09-30T00:00:00.000000+00:00", ...extraEnv },
+        env,
         stdio: ["pipe", "pipe", "pipe"],
       },
     );
@@ -155,6 +164,222 @@ function runMcp(
     );
     child.stdin.end(transcript);
   });
+}
+
+test("MCP runner allows only explicit env and refuses escaping writes before spawn", (t) => {
+  const root = workspace(t, "isolation");
+  const keys = ["HTTPS_PROXY", "TRAJECTA_WORK_ROOT", "TRAJECTA_IDENTITY_DATA_DIR", "TRAJECTA_IDENTITY_PROFILES"];
+  const before = keys.map((key) => [key, process.env[key]] as const);
+  try {
+    for (const key of keys) process.env[key] = "synthetic-parent-value";
+    const env = isolatedMcpEnv(root);
+    assert.equal(env.HTTPS_PROXY, undefined);
+    assert.equal(env.TRAJECTA_WORK_ROOT, undefined);
+    for (const key of [
+      "HOME",
+      "USERPROFILE",
+      "XDG_DATA_HOME",
+      "LOCALAPPDATA",
+      "APPDATA",
+      "TRAJECTA_IDENTITY_DATA_DIR",
+      "TRAJECTA_IDENTITY_PROFILES",
+    ])
+      assert(env[key].startsWith(root + (process.platform === "win32" ? "\\" : "/")));
+    assert(existsSync(resolve(env.TRAJECTA_IDENTITY_PROFILES, "example/profile.json")));
+    assertMcpPaths(root, env, "example", "store.sqlite3");
+    assert.throws(() => isolatedMcpEnv(root, { HTTPS_PROXY: "synthetic" }), /unapproved child env/);
+    assert.throws(() => assertMcpPaths(root, env, "example", "../outside.sqlite3"), /escapes MCP fixture/);
+    assert.throws(
+      () => assertMcpPaths(root, { ...env, TRAJECTA_IDENTITY_DATA_DIR: resolve(root, "..") }, "example"),
+      /escapes MCP fixture/,
+    );
+    assert.throws(
+      () => assertMcpPaths(root, { ...env, TRAJECTA_WORK_ROOT: "../work" }, "example"),
+      /escapes MCP fixture/,
+    );
+    if (process.platform !== "win32") {
+      const install = resolve(env.TRAJECTA_IDENTITY_DATA_DIR, "profiles/example");
+      mkdirSync(install, { recursive: true });
+      symlinkSync(resolve(root, "../synthetic-profile.json"), resolve(install, "profile.json"));
+      assert.throws(() => assertMcpPaths(root, env, "example"), /escapes MCP fixture/);
+    }
+  } finally {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+function runCommand(command: string, args: string[], root: string, env: Record<string, string>) {
+  return new Promise<{ code: number | null; stdout: Buffer; stderr: Buffer }>((done, reject) => {
+    const child = spawn(command, args, { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] });
+    const stdout: Buffer[] = [],
+      stderr: Buffer[] = [];
+    child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
+    child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+    child.on("error", reject);
+    child.on("close", (code) => done({ code, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) }));
+    child.stdin.end();
+  });
+}
+
+async function smokeMcp(
+  t: { after(callback: () => void): void },
+  root: string,
+  env: Record<string, string>,
+  command: string,
+  args: string[],
+  profileName: string,
+  database: string,
+  state: "ready" | "uninitialized",
+): Promise<void> {
+  const dbIndex = args.indexOf("--db");
+  assertMcpPaths(root, env, profileName, dbIndex < 0 ? undefined : args[dbIndex + 1]);
+  const before = existsSync(database) ? readFileSync(database) : undefined;
+  const lastPath = resolve(env.TRAJECTA_IDENTITY_DATA_DIR, ".last-profile");
+  const last = existsSync(lastPath) ? readFileSync(lastPath) : undefined;
+  const child = spawn(command, args, { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] });
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+  });
+  const stderr: Buffer[] = [];
+  child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+  const closed = new Promise<number | null>((done) => child.on("close", done));
+  const responses = new Promise<any[]>((done, reject) => {
+    let pending = "";
+    child.stdout.on("data", (chunk) => {
+      pending += Buffer.from(chunk).toString("utf8");
+      const lines = pending.split("\n");
+      if (lines.length >= 3) {
+        try {
+          done(lines.slice(0, 2).map((line) => plain(parseLossless(line))));
+        } catch (error) {
+          reject(error);
+        }
+      }
+    });
+    child.on("error", reject);
+    child.on("close", () => reject(new Error(`MCP exited before replies: ${Buffer.concat(stderr).toString("utf8")}`)));
+  });
+  child.stdin.write(
+    Buffer.from(
+      '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}\n' +
+        call("identity_status").toString("utf8") +
+        "\n",
+    ),
+  );
+  const [initialized, response] = await responses;
+  assert.equal(child.exitCode, null, "generated launcher must remain alive while stdin stays open");
+  assert.equal(child.signalCode, null);
+  assert.equal(initialized.result.protocolVersion, "2025-06-18");
+  assert.equal(response.result.isError, false);
+  const status = response.result.structuredContent;
+  assert.equal(status.profile, profileName);
+  assert.equal(status.db, database);
+  assert.equal(status.store, state);
+  if (state === "ready") {
+    const profile = profileNameFor(root, profileName, env);
+    assert.equal(profile, profileName);
+    const manifest = [
+      resolve(env.TRAJECTA_IDENTITY_PROFILES, profileName, "profile.json"),
+      resolve(env.TRAJECTA_IDENTITY_DATA_DIR, "profiles", profileName, "profile.json"),
+    ].find(existsSync)!;
+    const reference = new IdentityMemory(loadProfile(manifest), database, { surface: "mcp" });
+    try {
+      assert.deepEqual(status, reference.status());
+    } finally {
+      reference.close();
+    }
+  }
+  child.stdin.end();
+  assert.equal(await closed, 0, Buffer.concat(stderr).toString("utf8"));
+  assert.deepEqual(existsSync(database) ? readFileSync(database) : undefined, before, "status never writes the store");
+  assert.deepEqual(existsSync(lastPath) ? readFileSync(lastPath) : undefined, last, "MCP never remembers a choice");
+}
+
+for (const scenario of ["default-db", "explicit-db", "json-profile", "url-profile"]) {
+  test(`setup launches its exact MCP config: ${scenario}`, { timeout: 15000 }, async (t) => {
+    const root = workspace(t, `setup-${scenario}`);
+    const env = isolatedMcpEnv(root);
+    let name = "example",
+      spec = "example";
+    if (scenario === "json-profile" || scenario === "url-profile") {
+      name = `setup-${scenario}`;
+      const ast = object(parseLossless(readFileSync(PROFILE, "utf8")));
+      const bytes = Buffer.from(
+        pyJsonDumps(
+          orderedObject(ast.entries.map(([key, value]) => [key, key === "name" ? name : value] as [string, JsonValue])),
+        ),
+      );
+      if (scenario === "json-profile") {
+        spec = resolve(root, "input.json");
+        writeFileSync(spec, bytes);
+      } else {
+        const server = createServer((_request, response) => {
+          response.writeHead(200, { "Content-Type": "application/json" });
+          response.end(bytes);
+        });
+        await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+        t.after(() => server.close());
+        const address = server.address();
+        assert(address && typeof address !== "string");
+        spec = `http://127.0.0.1:${address.port}/profile.json`;
+      }
+    }
+    const explicit = scenario === "explicit-db";
+    const database = explicit ? resolve(root, "explicit.sqlite3") : profileDb(name, env);
+    // This includes the URL/JSON install destination before setup itself can write.
+    assertMcpPaths(root, env, name, database);
+    const setup = await runCommand(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        resolve(ROOT, "node/src/cli.ts"),
+        "--profile",
+        spec,
+        ...(explicit ? ["--db", "explicit.sqlite3"] : []),
+        "setup",
+      ],
+      root,
+      env,
+    );
+    assert.equal(setup.code, 0, setup.stderr.toString("utf8"));
+    const config = plain(parseLossless(setup.stdout.toString("utf8")));
+    const launchers = Object.values(config.mcpServers) as { command: string; args: string[] }[];
+    assert.equal(launchers.length, 1);
+    const launcher = launchers[0];
+    assert.equal(launcher.command, process.execPath);
+    assert.equal(launcher.args[launcher.args.indexOf("--profile") + 1], name);
+    if (explicit) assert.equal(launcher.args[launcher.args.indexOf("--db") + 1], database);
+    else assert(!launcher.args.includes("--db"));
+    assert(existsSync(database), "setup bootstraps the same store MCP must read");
+    // Launch exactly the returned command+args; do not repair or replace any argument.
+    await smokeMcp(t, root, env, launcher.command, launcher.args, name, database, "ready");
+  });
+}
+
+for (const args of [[], ["--profile", "example"]]) {
+  test(
+    `direct MCP entry permits no --db and ${args.length ? "a named" : "an omitted"} profile`,
+    { timeout: 15000 },
+    async (t) => {
+      const root = workspace(t, "direct-default");
+      const env = isolatedMcpEnv(root);
+      const database = profileDb("example", env);
+      await smokeMcp(
+        t,
+        root,
+        env,
+        process.execPath,
+        ["--experimental-strip-types", resolve(ROOT, "node/src/mcp.ts"), ...args],
+        "example",
+        database,
+        "uninitialized",
+      );
+      assert(!existsSync(database));
+    },
+  );
 }
 
 test("MCP manifest authenticates every corpus file, source and table", () => {
@@ -328,6 +553,11 @@ test("MCP process kill inside a writer transaction leaves no partial record", as
   const directory = workspace(t, "crash");
   const database = resolve(directory, "store.sqlite3");
   bootstrap(database);
+  const env = isolatedMcpEnv(directory, {
+    TRAJECTA_IDENTITY_MCP_CLOCK_START: "2026-09-30T00:00:00.000000+00:00",
+  });
+  const profile = resolve(env.TRAJECTA_IDENTITY_PROFILES, "example/profile.json");
+  assertMcpPaths(directory, env, profileNameFor(directory, profile, env), database);
   const child = spawn(
     process.execPath,
     [
@@ -335,13 +565,13 @@ test("MCP process kill inside a writer transaction leaves no partial record", as
       "--experimental-strip-types",
       resolve(ROOT, "node", "test", "mcp-crash-child.ts"),
       "--profile",
-      PROFILE,
+      profile,
       "--db",
       "store.sqlite3",
     ],
     {
       cwd: directory,
-      env: { ...process.env, TRAJECTA_IDENTITY_MCP_CLOCK_START: "2026-09-30T00:00:00.000000+00:00" },
+      env,
       stdio: ["pipe", "ignore", "pipe"],
     },
   );

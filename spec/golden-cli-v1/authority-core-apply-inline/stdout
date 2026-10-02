@@ -1,0 +1,24 @@
+Type APPLY f1807fd01f94 to issue the owner receipt: {
+  "operation_id": "operation:ed79ee2434202f9181327582df81ab1f",
+  "operation_type": "identity_core_revision",
+  "actor": "the owner",
+  "surface": "cli",
+  "target_record_id": "core",
+  "target_revision_id": null,
+  "decision": "materialized",
+  "reason": "apply",
+  "idempotency_key": "authority-v2:receipt:473f7316a20282544085dbc89d0d1ce7",
+  "created_at": "2026-09-30T00:00:03+00:00",
+  "evidence_ids": [
+    "evidence:evidence-v2:19b256d98541c418be8ea364af5d6588",
+    "evidence:evidence-v2:2547d506976d88c943073644cd06a123"
+  ],
+  "details": {
+    "core_revision_id": "core@r2-ed79ee243420",
+    "decision_note": "",
+    "outcome": "apply",
+    "proposal_id": "core-proposal:f1807fd01f9475071bc1dea03ae988f8",
+    "receipt_id": "receipt:473f7316a20282544085dbc89d0d1ce7"
+  },
+  "revision": null
+}
