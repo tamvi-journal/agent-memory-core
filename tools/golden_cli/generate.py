@@ -25,6 +25,7 @@ from memory_core import MemoryStore
 from tools.golden.generate import clock_context, dump_database
 from tools.golden_mcp import generate as mcp
 from tools.golden_cli.tokens import template, render
+from tools.golden_cli.decode import differential_table
 
 ORACLE_COMMIT = "4cbc3627f9edbe3a013fc1ea17d8188c5df47dd9"  # main + the committed P10/P13/P14 oracle patches
 ORACLE_SEMANTICS = [*mcp.ORACLE_SEMANTICS, "P10-read-only-doctor", "P11-read-no-create",
@@ -184,6 +185,12 @@ def scenario_matrix():
         scenarios.append({"name": f"usage-{index:02}", "argv": argv})
     for mode in ("name", "folder", "json", "url", "env", "last", "default", "failure", "profiles", "overwrite-json", "overwrite-url", "safe-name", "surrogate", "invalid-json", "invalid-utf8", "url-large", "url-invalid-core", "url-invalid-json", "url-invalid-utf8"):
         scenarios.append({"name": f"resolve-{mode}", "resolve": mode, "argv": ["--db", "store.sqlite3", "status"]})
+    for kind in ("nan", "infinity", "negative-infinity", "high-surrogate", "low-surrogate", "paired-surrogate"):
+        for command in ("status", "profiles"):
+            scenarios.append({"name": f"decode-profile-{kind}-{command}", "decode_profile": kind,
+                              "argv": ["--db", "store.sqlite3", command]})
+        scenarios.append({"name": f"decode-install-{kind}", "decode_profile": kind, "install": True,
+                          "argv": ["--db", "store.sqlite3", "status"]})
     for mode in ("missing-dry", "missing-backup-equal", "v2", "v3", "v4", "existing-target", "existing-backup", "equal-backup", "dry-parent"):
         state = "missing" if mode.startswith("missing") else mode if mode in {"v2", "v3"} else "legacy-v4"
         argv = ["--db", "store.sqlite3", "migrate-to", "target.sqlite3"]
@@ -254,6 +261,22 @@ def prepare(work, scenario):
             dest = work / "data/profiles/remote"; dest.mkdir(parents=True)
             old = dict(data); old["core"] = dict(data["core"], summary="old installed contents")
             (dest / "profile.json").write_text(json.dumps(old), encoding="utf8")
+    kind = scenario.get("decode_profile")
+    if kind:
+        data = json.loads((BUNDLED / "example/profile.json").read_text())
+        data["name"] = "extended"
+        if kind in {"nan", "infinity", "negative-infinity"}:
+            data["v"] = {"nan": float("nan"), "infinity": float("inf"), "negative-infinity": float("-inf")}[kind]
+        else:
+            data["name"] = {"high-surrogate": "\ud800", "low-surrogate": "\udfff", "paired-surrogate": "😀"}[kind]
+            data["core"]["summary"] = "display " + data["name"]
+        if scenario.get("install"):
+            (work / "recipe.json").write_text(json.dumps(data, ensure_ascii=True), encoding="utf8")
+            argv = ["-p", "recipe.json", *argv]
+        else:
+            folder = work / "profiles/extended"; folder.mkdir()
+            (folder / "profile.json").write_text(json.dumps(data, ensure_ascii=True), encoding="utf8")
+            if "status" in argv: argv = ["-p", "extended", *argv]
     migration = scenario.get("migration")
     if migration == "existing-target": (work / "target.sqlite3").write_bytes(b"target")
     if migration == "existing-backup": (work / "backup.sqlite3").write_bytes(b"backup")
@@ -319,6 +342,7 @@ def generate(output):
     if output.exists() and any(output.iterdir()): raise SystemExit("output directory must be empty")
     output.mkdir(parents=True, exist_ok=True)
     hashes = write_tables(output)
+    write_json(output / "decode-errors.json", differential_table(ORACLE_COMMIT))
     isolation = ROOT / ".isolation"; isolation.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cli-golden-", dir=isolation) as temporary:
         workspace = Path(temporary).resolve()

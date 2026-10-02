@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { parseProfileJson, strictUtf8 } from "../src/cli-decode.ts";
+import { canonicalJson, floatHex, type JsonValue } from "../src/encoding.ts";
 import {
   copyFileSync,
   cpSync,
@@ -361,3 +364,57 @@ for (const table of ["isalnum", "decimal", "whitespace"])
     assert.equal(result.status, 1);
     assert.match(result.stderr.toString(), new RegExp(`CLI ${table} table sha256 mismatch`));
   });
+
+function decodeMetadata(value: JsonValue): any {
+  if (Array.isArray(value)) return value.map(decodeMetadata);
+  if (value && typeof value === "object") {
+    if (value.kind === "object") return Object.fromEntries(value.entries.map(([k, v]) => [k, decodeMetadata(v)]));
+    return Number(value.value);
+  }
+  return value;
+}
+function decodeCanonical(value: JsonValue): unknown {
+  if (value === null) return { kind: "null" };
+  if (typeof value === "boolean") return { kind: "bool", value };
+  if (typeof value === "string") return { kind: "string", codepoints: Array.from(value, (c) => c.codePointAt(0)!) };
+  if (Array.isArray(value)) return { kind: "array", items: value.map(decodeCanonical) };
+  if (value.kind === "int") return { kind: "int", value: value.value.toString() };
+  if (value.kind === "float")
+    return {
+      kind: "float",
+      value: Number.isNaN(value.value)
+        ? "nan"
+        : value.value === Infinity
+          ? "inf"
+          : value.value === -Infinity
+            ? "-inf"
+            : floatHex(value.value),
+    };
+  return { kind: "object", entries: value.entries.map(([k, v]) => [decodeCanonical(k), decodeCanonical(v)]) };
+}
+test("B1 every Python-generated JSON and UTF-8 decode outcome matches exactly", () => {
+  const bytes = readFileSync(resolve(CORPUS, "decode-errors.json"));
+  const manifest = decodeMetadata(parseLossless(readFileSync(resolve(CORPUS, "MANIFEST.json"), "utf8")));
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), manifest.files["decode-errors.json"]);
+  const table = decodeMetadata(parseLossless(bytes.toString("utf8")));
+  assert.equal(table.schema, "trajecta.cli-decode-outcomes/v1");
+  assert.equal(table.unicode, "14.0.0");
+  for (const row of table.rows) {
+    let outcome: unknown;
+    try {
+      const text = strictUtf8(Buffer.from(row.input_hex, "hex"));
+      outcome = { ok: decodeCanonical(row.decoder === "json" ? parseProfileJson(text) : text) };
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      outcome = { error: `${error.constructor.name}: ${error.message}` };
+    }
+    assert.deepEqual(outcome, row.outcome, row.id);
+  }
+});
+test("B1 profile decoding accepts Python extensions while the R0 hash boundary stays strict", () => {
+  for (const text of ["NaN", "Infinity", "-Infinity", '"\\ud800"', '"\\udfff"']) {
+    const value = parseProfileJson(text);
+    assert.throws(() => canonicalJson(value));
+    assert.throws(() => parseLossless(text));
+  }
+});

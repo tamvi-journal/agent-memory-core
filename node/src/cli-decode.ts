@@ -4,6 +4,7 @@ import { parseLossless } from "./json.ts";
 import type { JsonValue } from "./encoding.ts";
 export class UnicodeDecodeError extends ValueError {}
 export class JSONDecodeError extends ValueError {}
+export class UnicodeEncodeError extends ValueError {}
 export function strictUtf8(bytes: Uint8Array): string {
   const fail = (start: number, end: number, reason: string): never => {
     const location =
@@ -39,69 +40,50 @@ export function strictUtf8(bytes: Uint8Array): string {
   }
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 }
-export function parseProfileJson(source: string, allowLoneSurrogates = false): JsonValue {
+/** CPython JSON syntax, including its accepted nonfinite constants and surrogate escapes.
+ * Error locations come directly from scanner states, never from remapped SyntaxError text.
+ */
+export function parseProfileJson(source: string): JsonValue {
   const fail = (message: string, offset: number): never => {
-    const prefix = Array.from(source.slice(0, offset)).join(""),
+    const prefix = source.slice(0, offset),
       cp = Array.from(prefix).length;
-    const line = prefix.split("\n").length,
-      column = Array.from(prefix.slice(prefix.lastIndexOf("\n") + 1)).length + 1;
+    const line = prefix.split("\n").length;
+    const column = Array.from(prefix.slice(prefix.lastIndexOf("\n") + 1)).length + 1;
     throw new JSONDecodeError(`${message}: line ${line} column ${column} (char ${cp})`);
   };
   if (source.startsWith("\ufeff")) fail("Unexpected UTF-8 BOM (decode using utf-8-sig)", 0);
-  try {
-    return parseLossless(source, { allowLoneSurrogates });
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    const match = /^(.*) at (\d+)$/u.exec(error.message);
-    if (!match) throw error;
-    let offset = Number(match[2]),
-      message = "Expecting value";
-    switch (match[1]) {
-      case "expected string":
-        message = "Expecting property name enclosed in double quotes";
-        offset--;
-        break;
-      case "expected comma":
-        message = "Expecting ',' delimiter";
-        offset--;
-        break;
-      case "expected colon":
-        message = "Expecting ':' delimiter";
-        offset--;
-        break;
-      case "trailing input":
-        message = "Extra data";
-        break;
-      case "unescaped control character":
-        message = "Invalid control character at";
-        offset--;
-        break;
-      case "invalid escape":
-        message = "Invalid \\escape";
-        offset -= 2;
-        break;
-      case "invalid unicode escape":
-        message = "Invalid \\uXXXX escape";
-        offset--;
-        break;
-      case "unterminated string": {
-        message = "Unterminated string starting at";
-        let start = -1;
-        for (let i = 0; i < source.length; i++) {
-          if (start >= 0 && source[i] === "\\") {
-            i++;
-            continue;
-          }
-          if (source[i] === '"') start = start < 0 ? i : -1;
-        }
-        offset = Math.max(0, start);
-        break;
-      }
-      case "lone surrogate in string":
-        throw new ValueError("lone surrogate in profile string");
-      case "non-finite number":
-        throw new ValueError("non-finite number in profile JSON");
-    }
-    return fail(message, offset);
+  return parseLossless(source, {
+    allowLoneSurrogates: true,
+    allowNonFinite: true,
+    pythonError: fail,
+    parseInteger(text) {
+      const digits = text.startsWith("-") ? text.length - 1 : text.length;
+      if (digits > 4300)
+        throw new ValueError(
+          `Exceeds the limit (4300 digits) for integer string conversion: value has ${digits} digits; ` +
+            "use sys.set_int_max_str_digits() to increase the limit",
+        );
+      return { kind: "int", value: BigInt(text), text };
+    },
+  });
+}
+
+/** Strict Python UTF-8 encode used by profile file writes, not CLI display output. */
+export function strictProfileUtf8(source: string): Buffer {
+  const chars = Array.from(source);
+  for (let start = 0; start < chars.length; start++) {
+    const invalid = (index: number) => {
+      const cp = chars[index]?.codePointAt(0) ?? 0;
+      return cp >= 0xd800 && cp <= 0xdfff;
+    };
+    if (!invalid(start)) continue;
+    let end = start + 1;
+    while (invalid(end)) end++;
+    const location =
+      end === start + 1
+        ? `character '\\u${chars[start].codePointAt(0)!.toString(16).padStart(4, "0")}' in position ${start}`
+        : `characters in position ${start}-${end - 1}`;
+    throw new UnicodeEncodeError(`'utf-8' codec can't encode ${location}: surrogates not allowed`);
   }
+  return Buffer.from(source, "utf8");
 }

@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { canonicalJson, hashPayload, orderedObject, pyFloat, type JsonValue, type OrderedObject } from "./encoding.ts";
+import {
+  canonicalJson,
+  hashPayload,
+  orderedObject,
+  pyFloat,
+  pythonJsonQuote,
+  type JsonValue,
+  type OrderedObject,
+} from "./encoding.ts";
 import {
   ConfirmationMismatch,
   HumanPresenceRequired,
@@ -52,7 +60,17 @@ const str = (row: Row, key: string): string => String(row[key] ?? "");
 function quote(value: string): string {
   return canonicalJson(value);
 }
-function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = false): string {
+function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = false, profile = false): string {
+  if (profile && typeof value === "string") return pythonJsonQuote(value);
+  if (
+    profile &&
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    value.kind === "float" &&
+    !Number.isFinite(value.value)
+  )
+    return Number.isNaN(value.value) ? "NaN" : value.value < 0 ? "-Infinity" : "Infinity";
   if (
     value === null ||
     typeof value === "boolean" ||
@@ -64,8 +82,9 @@ function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = fal
   const pad = (n: number) => " ".repeat(n);
   if (Array.isArray(value)) {
     if (!value.length) return "[]";
-    if (indent === null) return `[${value.map((item) => jsonWith(item, null, level, sort)).join(", ")}]`;
-    return `[\n${value.map((item) => `${pad(level + indent)}${jsonWith(item, indent, level + indent, sort)}`).join(",\n")}\n${pad(level)}]`;
+    if (indent === null) return `[${value.map((item) => jsonWith(item, null, level, sort, profile)).join(", ")}]`;
+    const lines = value.map((item) => `${pad(level + indent)}${jsonWith(item, indent, level + indent, sort, profile)}`);
+    return `[\n${lines.join(",\n")}\n${pad(level)}]`;
   }
   let entries = value.entries;
   if (sort) entries = [...entries].sort(([a], [b]) => Array.from(a).join("").localeCompare(Array.from(b).join("")));
@@ -78,11 +97,19 @@ function jsonWith(value: JsonValue, indent: number | null, level = 0, sort = fal
       return left.length - right.length;
     });
   if (!entries.length) return "{}";
-  if (indent === null)
-    return `{${entries.map(([key, item]) => `${quote(key)}: ${jsonWith(item, null, level, sort)}`).join(", ")}}`;
-  return `{\n${entries.map(([key, item]) => `${pad(level + indent)}${quote(key)}: ${jsonWith(item, indent, level + indent, sort)}`).join(",\n")}\n${pad(level)}}`;
+  const keyQuote = profile ? pythonJsonQuote : quote;
+  if (indent === null) {
+    const fields = entries.map(([key, item]) => `${keyQuote(key)}: ${jsonWith(item, null, level, sort, profile)}`);
+    return `{${fields.join(", ")}}`;
+  }
+  const lines = entries.map(([key, item]) => {
+    const rendered = jsonWith(item, indent, level + indent, sort, profile);
+    return `${pad(level + indent)}${keyQuote(key)}: ${rendered}`;
+  });
+  return `{\n${lines.join(",\n")}\n${pad(level)}}`;
 }
-export const pythonIndentedJson = (value: JsonValue, indent = 1): string => jsonWith(value, indent);
+export const pythonIndentedJson = (value: JsonValue, indent = 1, profile = false): string =>
+  jsonWith(value, indent, 0, false, profile);
 const pythonDefaultJson = (value: JsonValue, sort = false): string => jsonWith(value, null, 0, sort);
 
 function valueFromRow(value: unknown, float = false): JsonValue {

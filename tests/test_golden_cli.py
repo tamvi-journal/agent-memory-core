@@ -118,3 +118,34 @@ def test_database_classes_are_explicit_and_cannot_relax_unchanged_fixtures():
                 assert entry["oracle_sha256"] == hashlib.sha256((directory / "fixture" / entry["source"]).read_bytes()).hexdigest()
             else: pytest.fail(f"unrecognized database class {kind}")
     assert kinds == {"absent", "unchanged", "written", "backup"}
+
+
+@pytest.mark.skipif(sys.version_info[:2] != (3, 11) or unicodedata.unidata_version != "14.0.0",
+                    reason="CLI decoder outcomes require Python 3.11 / Unicode 14.0.0")
+def test_decode_outcomes_are_generated_by_python_and_cover_every_error_category():
+    from tools.golden_cli.decode import differential_table
+    from tools.golden_cli.generate import ORACLE_COMMIT
+    stored = json.loads((CORPUS / "decode-errors.json").read_text())
+    actual = differential_table(ORACLE_COMMIT)
+    # Patch release is provenance; the decoder outcomes must still all agree.
+    assert actual["rows"] == stored["rows"]
+    assert actual["oracle_commit"] == stored["oracle_commit"]
+    categories = {}
+    for row in stored["rows"]:
+        error = row["outcome"].get("error", "")
+        if row["decoder"] == "json" and error.startswith("JSONDecodeError:"):
+            message, position = error.rsplit(": line ", 1)
+            offset = int(position.rsplit("(char ", 1)[1][:-1])
+            categories.setdefault(message, set()).add(offset)
+    assert set(categories) == {"JSONDecodeError: " + name for name in [
+        "Expecting value", "Expecting property name enclosed in double quotes", "Expecting ':' delimiter",
+        "Expecting ',' delimiter", "Invalid control character at", "Invalid \\escape", "Invalid \\uXXXX escape",
+        "Unterminated string starting at", "Extra data", "Unexpected UTF-8 BOM (decode using utf-8-sig)"]}
+    for name, offsets in categories.items():
+        if "BOM" in name: assert offsets == {0}  # CPython tests only the first character.
+        else: assert len(offsets) >= 2, name
+    utf8 = {bytes.fromhex(row["input_hex"]) for row in stored["rows"] if row["decoder"] == "utf8"}
+    assert all(bytes([byte]) in utf8 for byte in range(256))
+    for lead in (0xE0, 0xED, 0xF0, 0xF4):
+        assert any(data[0] == lead and len(data) > 1 for data in utf8)
+    assert len({row["id"] for row in stored["rows"]}) == len(stored["rows"])

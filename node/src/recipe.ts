@@ -1,5 +1,14 @@
-import { strictUtf8, parseProfileJson } from "./cli-decode.ts";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { strictUtf8, parseProfileJson, strictProfileUtf8 } from "./cli-decode.ts";
+import {
+  openSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, extname, join } from "node:path";
 import {
   compareCodePoint,
@@ -23,8 +32,7 @@ const object = (value: JsonValue | undefined): OrderedObject => {
   return value as OrderedObject;
 };
 export { strictUtf8 } from "./cli-decode.ts";
-const readJson = (file: string, allowLoneSurrogates = false) =>
-  object(parseProfileJson(strictUtf8(readFileSync(file)), allowLoneSurrogates));
+const readJson = (file: string) => object(parseProfileJson(strictUtf8(readFileSync(file))));
 const isFile = (path: string) => {
   try {
     return statSync(path).isFile();
@@ -74,7 +82,13 @@ function install(data: OrderedObject, env: Environment): string {
   const name = pyStrip(asString(get(data, "name")));
   const target = join(dataDir(process.platform, env), "profiles", safeFsName(name));
   mkdirSync(target, { recursive: true });
-  writeFileSync(join(target, "profile.json"), pythonIndentedJson(data, 2) + "\n", "utf8");
+  // Path.write_text opens/truncates first; strict encode failure leaves the empty file.
+  const fd = openSync(join(target, "profile.json"), "w");
+  try {
+    writeFileSync(fd, strictProfileUtf8(pythonIndentedJson(data, 2, true) + "\n"));
+  } finally {
+    closeSync(fd);
+  }
   return name;
 }
 export async function fetchProfile(url: string): Promise<OrderedObject> {
@@ -145,7 +159,7 @@ export function listProfiles(env: Environment = process.env): Record<string, unk
       if (name.startsWith("_") || !isFile(manifest)) continue;
       let data: OrderedObject;
       try {
-        data = readJson(manifest, true);
+        data = readJson(manifest);
       } catch {
         continue;
       }
