@@ -55,10 +55,33 @@ export function parseLossless(
       };
       if (escape in short) result += short[escape];
       else if (escape === "u") {
-        const hex = source.slice(offset, offset + 4);
-        if (!/^[0-9a-fA-F]{4}$/.test(hex)) fail("invalid unicode escape", "Invalid \\uXXXX escape", offset - 1);
-        result += String.fromCharCode(Number.parseInt(hex, 16));
+        const decodeHex = (uIndex: number): number => {
+          const end = uIndex + 5;
+          const hex = source.slice(uIndex + 1, end);
+          // CPython 3.11 scanstring requires a character after the four digits.
+          if ((options.pythonError && end >= source.length) || !/^[0-9a-fA-F]{4}$/.test(hex))
+            fail("invalid unicode escape", "Invalid \\uXXXX escape", uIndex);
+          return Number.parseInt(hex, 16);
+        };
+        const unit = decodeHex(offset - 1);
+        result += String.fromCharCode(unit);
         offset += 4;
+        // CPython only looks ahead at a second complete escape with a following character.
+        // Fourteen UTF-16 units cover the seven source code points needed by that bound.
+        // A non-low surrogate is left for the next scanner iteration.
+        if (
+          options.pythonError &&
+          unit >= 0xd800 &&
+          unit <= 0xdbff &&
+          Array.from(source.slice(offset, offset + 14)).length > 6 &&
+          source.slice(offset, offset + 2) === "\\u"
+        ) {
+          const second = decodeHex(offset + 1);
+          if (second >= 0xdc00 && second <= 0xdfff) {
+            result += String.fromCharCode(second);
+            offset += 6;
+          }
+        }
       } else fail("invalid escape", "Invalid \\escape", offset - 2);
     }
     return fail("unterminated string", "Unterminated string starting at", start);

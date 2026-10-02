@@ -399,6 +399,9 @@ test("B1 every Python-generated JSON and UTF-8 decode outcome matches exactly", 
   const table = decodeMetadata(parseLossless(bytes.toString("utf8")));
   assert.equal(table.schema, "trajecta.cli-decode-outcomes/v1");
   assert.equal(table.unicode, "14.0.0");
+  assert.deepEqual(table.mutation_fuzz, { seed: 220085, count: 2000 });
+  assert.equal(table.rows.filter((row: any) => row.id.startsWith("json-eof-")).length, 120);
+  assert.equal(table.rows.filter((row: any) => row.id.startsWith("json-fuzz-")).length, 2000);
   for (const row of table.rows) {
     let outcome: unknown;
     try {

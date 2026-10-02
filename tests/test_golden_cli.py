@@ -149,3 +149,21 @@ def test_decode_outcomes_are_generated_by_python_and_cover_every_error_category(
     for lead in (0xE0, 0xED, 0xF0, 0xF4):
         assert any(data[0] == lead and len(data) > 1 for data in utf8)
     assert len({row["id"] for row in stored["rows"]}) == len(stored["rows"])
+
+
+@pytest.mark.skipif(sys.version_info[:2] != (3, 11) or unicodedata.unidata_version != "14.0.0",
+                    reason="CLI EOF and mutation outcomes require Python 3.11 / Unicode 14.0.0")
+def test_decode_eof_boundaries_and_seeded_mutations_are_pinned():
+    from tools.golden_cli.decode import eof_inputs, mutation_inputs, FUZZ_SEED, FUZZ_COUNT
+    table = json.loads((CORPUS / "decode-errors.json").read_text())
+    assert table["mutation_fuzz"] == {"seed": FUZZ_SEED, "count": FUZZ_COUNT}
+    rows = table["rows"]
+    eof = [bytes.fromhex(row["input_hex"]).decode() for row in rows if row["id"].startswith("json-eof-")]
+    assert eof == list(eof_inputs())
+    assert len(eof) == 120
+    fuzz = [bytes.fromhex(row["input_hex"]).decode() for row in rows if row["id"].startswith("json-fuzz-")]
+    assert len(fuzz) == 2000
+    assert fuzz == list(mutation_inputs()) == list(mutation_inputs())
+    by_input = {bytes.fromhex(row["input_hex"]).decode(): row["outcome"] for row in rows if row["decoder"] == "json"}
+    for source in ['"\\u0041', '"\\ud83d\\ude00', '{"n":"é😀\\ud83d\\ude00']:
+        assert by_input[source]["error"].startswith("JSONDecodeError: Invalid \\uXXXX escape:")

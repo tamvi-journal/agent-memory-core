@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import math
+import random
 import sys
 import unicodedata
 
@@ -15,6 +16,41 @@ def canonical(value):
         return {"kind": "float", "value": "nan" if math.isnan(value) else value.hex()}
     if isinstance(value, list): return {"kind": "array", "items": [canonical(item) for item in value]}
     return {"kind": "object", "entries": [[canonical(key), canonical(item)] for key, item in value.items()]}
+
+
+FUZZ_SEED = 220085
+FUZZ_COUNT = 2000
+
+
+def eof_inputs():
+    # Raw input strings: no closing quote; every diagnostic comes from json.loads.
+    tails = [r"\u0041", r"\u", r"\u0", r"\u00", r"\u004",
+             "\\ud83d\\", r"\ud83d\u", r"\ud83d\ude0", r"\ud83d\ude00",
+             r"\ud83dx", r"\ud83d\n", r"\ud83d\x", r"\ud83d\u0041",
+             r"\ud83d\uX000", r"\ud83d\ud83d"]
+    for prefix in ['"', '{"n":"é', '["😀",\n"é', '{"n":"é😀']:
+        for tail in tails:
+            yield prefix + tail
+            yield prefix + tail + '"'  # Distinguish EOF from a following terminator.
+
+
+def mutation_inputs():
+    rng = random.Random(FUZZ_SEED)
+    seeds = ['{"name":"x","v":NaN}', '[null,true,false,1,-0.0,1e9999]',
+             '{"n":"é😀","n":"last"}', '"\\ud83d\\ude00"', '"\\u0041"',
+             '["😀",\n"escaped \\" and \\\\ and \\t"]', '{"nested":[{"x":1.0}]}']
+    seeds += list(eof_inputs())
+    alphabet = list('"\\{}[],:0123456789.eE+-uabcdefntfN') + [' ', '\n', '\t', '\x00', 'é', '😀']
+    for _ in range(FUZZ_COUNT):
+        text = rng.choice(seeds)
+        for _ in range(rng.randrange(1, 5)):
+            action = rng.randrange(4)
+            position = rng.randrange(len(text) + 1)
+            if action == 0: text = text[:position] + rng.choice(alphabet) + text[position:]
+            elif action == 1: text = text[:position] + text[position + 1:]
+            elif action == 2: text = text[:position] + rng.choice(alphabet) + text[position + 1:]
+            else: text = text[:position]
+        yield text
 
 
 def differential_table(oracle_commit):
@@ -41,6 +77,8 @@ def differential_table(oracle_commit):
         '"escaped \\" and \\\\ and /"', '"\\b\\f\\n\\r\\t"', '[null,true,false,1,1.0,"😀"]',
         '9'*4300, '9'*4301]
     for n, text in enumerate(snippets): add("json", text.encode("utf-8"), f"json-{n:03}")
+    for n, text in enumerate(eof_inputs()): add("json", text.encode("utf-8"), f"json-eof-{n:03}")
+    for n, text in enumerate(mutation_inputs()): add("json", text.encode("utf-8"), f"json-fuzz-{n:04}")
     sequences = [bytes([byte]) for byte in range(256)]
     for lead, lo, hi, width in [(0xC2,0x80,0xBF,2),(0xDF,0x80,0xBF,2),
         (0xE0,0xA0,0xBF,3),(0xED,0x80,0x9F,3),(0xE1,0x80,0xBF,3),(0xEF,0x80,0xBF,3),
@@ -59,4 +97,5 @@ def differential_table(oracle_commit):
             add("utf8", prefix + data, f"utf8-{n:03}-{label}")
     return {"schema": "trajecta.cli-decode-outcomes/v1", "generator": "tools/golden_cli/decode.py",
             "oracle_commit": oracle_commit, "python": sys.version.split()[0],
-            "unicode": unicodedata.unidata_version, "rows": rows}
+            "unicode": unicodedata.unidata_version,
+            "mutation_fuzz": {"seed": FUZZ_SEED, "count": FUZZ_COUNT}, "rows": rows}
