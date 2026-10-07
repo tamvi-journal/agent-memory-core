@@ -1,152 +1,233 @@
 # R3: cross-runtime runs, differential fuzzing, migration rehearsal
 
-Status: draft for Lam's review. Author: Aux (leader). Builds on R0, R2a–R2d.
+Status: settled by Lam's review @ f2ac000 (Q1–Q5 and F1–F5 applied; §6). Author: Aux (leader). Builds on R0 and R2a–R2d.
 
 ## 0. Goal, scope, dependency
 
-R2a–R2d proved that each TS surface matches the Python oracle **one runtime at a time**, against fixed corpora. R3 proves the remaining three things before R4 can switch the installer:
+R2a–R2d proved that each TS surface matches the Python oracle **one runtime at a time**, against fixed corpora. Before R4 can switch the installer, R3 proves three more things:
 
-1. **X — cross-runtime.** One store can be driven alternately by Python and TS processes, and the result is the same as if a single runtime had done all the work.
-2. **Z — differential fuzzing.** Seeded, generated inputs at every public boundary produce the same bytes in both runtimes, beyond what the hand-picked corpora cover.
-3. **M — migration rehearsal.** A copy of a real store migrates, checks and reads identically in both runtimes. No real content leaves the owner's machine.
+1. **X, cross-runtime:** Python and TS processes can drive one store alternately, and the result is the same as if a single runtime had done all the work.
+2. **Z, differential fuzzing:** seeded, generated inputs at every public boundary produce the same bytes in both runtimes, beyond what the hand-picked corpora cover.
+3. **M, migration rehearsal:** a copy of a real store migrates, checks and reads identically in both runtimes, and no real content leaves the owner's machine.
 
-**F0 — dependency.** Work starts from `main` at or after 34098d7 (PR #22 merged). If main does not contain `docs/specs/2026-10-01-r2d-ts-cli.md` §5.2 and `node/src/cli.ts`, stop and report.
+**F0, dependency.** Work starts from `main` at or after 34098d7 (PR #22 merged). If `main` does not contain `docs/specs/2026-10-01-r2d-ts-cli.md` §5.2 and `node/src/cli.ts`, stop and report.
 
 **Out of scope**
 - **R2e:** `view` and `plugin`. `import-aml` stays Python-only until R4.
-- **R4:** the installer, cutover, the single version source (0.4.0 vs 0.1.0), G13 and G14.
-- G1–G14 stay frozen, except for what P15 (§3.4) changes.
+- **R4:** the installer, the cutover, the single version source (0.4.0 versus 0.1.0), G13 and G14.
+- **Frozen gaps:** G1–G14 stay frozen. P15 (§3.4) does not change them, as its regression test proves.
 
 ## 1. Comparison law (reused)
 
-Every comparison in R3 uses the laws already settled:
+Every comparison reuses a settled law:
 - R2c for MCP wire bytes.
-- R2d §5.1 for run-specific tokens and §5.2 for database classes. A `written` store is compared by the R0 dump plus the schema record, with no sidecars left. An `unchanged` store keeps its exact bytes, sidecar inventory, `mtime` and mode.
+- R2d §5.1 for run-specific tokens.
+- R2d §5.2 for database classes:
+  - a `written` store is compared by its R0 dump plus its schema record, with no sidecar left behind;
+  - an `unchanged` store keeps its exact bytes, its sidecar inventory, its `mtime` and its mode.
 
-R3 introduces **no** new tolerance. If a case needs one, stop and report.
+R3 adds **no** tolerance. A case that seems to need one is a stop-and-report.
 
-## 2. X — cross-runtime runs
+Every independent run starts from a **fresh, identical fixture**. Mutable stores are never reused between a baseline run and a mixed run. Runs may share exactly the same injected clock values.
+
+## 2. X: cross-runtime runs
 
 ### 2.1 Sequential interleaving (exact)
 
 A **plan** is a seeded list of steps. Each step is `(runtime, surface, operation, arguments)`:
-- `runtime` is `py` or `ts`;
-- `surface` is the CLI, or one MCP session (a process that runs a sequence of calls, then exits);
-- `operation` covers every write and read in scope: `init`, `log-phase`, `log-fact`, `close-loop`, `decay`, tracked and read-only `retrieve`, `status`, `timeline`, `core-proposals`, the self-authored core proposal path, `apply-receipt`, `doctor`, `migrate-to` on a copy, and the owner approve commands through the injected terminal.
+- `runtime` is `py` or `ts`.
+- `surface` is the CLI, or one MCP session (a process that runs a sequence of calls, then exits).
+- `operation` covers every write and read in scope:
+  - `init`, `log-phase`, `log-fact`, `close-loop`, `decay`;
+  - tracked and read-only `retrieve`, `status`, `timeline`, `core-proposals`;
+  - the self-authored core proposal path, `apply-receipt`, `doctor`, and `migrate-to` on a copy;
+  - the owner approve commands, through the injected terminal.
 
-For each plan:
-- **Run A** executes every step in Python.
-- **Run B** executes the same steps with each step's runtime taken from the plan.
-- Both runs use the same injected clock sequence, so timestamps are identical.
+For each plan there are two runs:
+- **Run A** executes every step in Python, starting from fixture F.
+- **Run B** starts from a fresh copy of the same F and executes the same steps, each in the runtime the plan names. It uses the same injected clock values.
 
 The law:
-- stdout, stderr and exit code of each step are identical (with tokens rendered);
-- after each step, the store's R0 dump and schema record are identical;
-- after the last step, the whole file tree is identical under §5.2.
+- Each step has identical stdout, stderr and exit code (tokens rendered).
+- After each step, the R0 dump and the schema record are identical.
+- After the last step, the whole file tree is identical under §5.2.
 
-Plans:
-- A fixed matrix of hand-built plans, at least one per pair of surfaces (`py-cli→ts-mcp`, `ts-cli→py-mcp`, and so on), that cross every receipt kind. Issuance happens in one runtime and consumption in the other.
-- Seeded random plans: 200 per CI run, with the seed list fixed in the repo. A failing seed is shrunk to a minimal plan, which is added to the fixed matrix.
+The plans come from two sources:
+- **A fixed matrix of hand-built plans.**
+  - There is at least one plan per pair of surfaces (`py-cli→ts-mcp`, `ts-cli→py-mcp`, and so on).
+  - Together the plans cover every receipt kind, each issued in one runtime and consumed in the other.
+- **Seeded random plans.**
+  - Each CI run executes 200 of them, from a seed list fixed in the repo.
+  - A failing seed is shrunk to a minimal plan, which is added to the fixed matrix as a reviewed source change.
 
-### 2.2 Version boundaries
+### 2.2 Version boundaries and crashes (F1)
 
 - A store **created** by TS is opened by Python for every read and write in scope, and the reverse.
-- A store whose last writer was one runtime is reopened by the other after a `kill -9` mid-write. This uses the R2c crash harness on both sides. The law: the store passes the `doctor` ready checks, and its dump equals the dump before the interrupted step, or the dump after it. Nothing in between.
+- **`kill -9` mid-write.** The R2c crash harness is used on both sides: the process is killed at each instrumented point, then the store is reopened and the operation retried from the **other** runtime. The law depends on the crash class:
 
-### 2.3 Concurrent access (invariant law)
+| Crash class | Law after the kill |
+|---|---|
+| Single-transaction kernel or authority write (intake submit, revise, relation event, receipt issue or consume) | The dump equals the state before the step or the state after it. Nothing in between. |
+| **G9** `decay` | The maintenance DB commit may exist while the activation sidecar is still stale or missing. This is the exact intermediate state frozen in R2b. |
+| **G10** `log_phase` / `log_fact` | The submit may be committed while some relations or cues are not. This is the exact intermediate state frozen in R2b. |
+| **G12** tracked `retrieve` | One or more `record_access` commits may exist while the remaining accesses and `apply_recall` do not. This is the exact intermediate state frozen in R2b. |
 
-Two processes, one per runtime, write the same store at the same time: M steps each, at least 3 seeds. Interleaving is not deterministic, so exact equality is replaced by these invariants:
-1. Every step either commits or fails with a public typed error (a busy or locked condition maps to the same public error in both runtimes; P16, §3.5). There are no untyped crashes and no partial writes.
-2. The final store passes all seven `doctor` checks.
-3. The final dump equals the dump of **some** sequential order of the committed steps. The commit order comes from a log that the harness appends to after each commit returns, cross-checked against the store's own sequence columns. A checker replays the committed steps in that order, in Python, and compares.
-4. No sidecar remains after both processes exit.
+- **G9, G10 and G12.** These are the crash law already frozen in R2b, not a new tolerance. For each of these classes, X asserts the exact intermediate state R2b defined. It then retries from the other runtime and proves the R2b semantics, including the non-converging retry of G12.
+- **Every class:** the store passes the `doctor` ready checks after the kill and after the retry.
 
-## 3. Z — differential fuzzing
+### 2.3 Concurrent access (Q4, Q5)
+
+Two processes, one per runtime, write the same store at the same time. Each runs M steps, with at least 3 seeds. This runs on Ubuntu, macOS **and Windows**.
+
+Each operation is recorded with two times on a shared monotonic clock:
+- `invoke_ts`, taken just before the operation is issued;
+- `return_ts`, taken just after it returns.
+
+The law has four parts:
+1. **Every step commits or fails with a public typed error.** Busy and locked conditions follow P16 (§3.5).
+2. **The final store passes** all seven `doctor` checks.
+3. **Serializability.**
+   - A candidate serial order must respect each process's program order and the real-time happens-before relation: if op a returned before op b was invoked, a comes before b.
+   - For **M ≤ 3**, every such serial order is enumerated. The final dump must equal the dump of at least one of them, each replayed from a fresh fixture in Python.
+   - For **M > 3**, a search finds **one** order that satisfies those constraints and the store-local ordering evidence (the per-record lifecycle and relation sequence numbers, and the receipt states). That order is replayed in Python, and the final dump must match.
+   - A log the harness writes after each operation returns is **diagnostic only**. It is never the proof of commit order.
+4. **No sidecar remains** after both processes exit.
+
+## 3. Z: differential fuzzing
 
 ### 3.1 Boundaries and generators
 
 | Boundary | Generator | Compared |
 |---|---|---|
-| MCP raw stdin | Seeded frame mutations from the R2c corpus transcripts: byte flips, invalid UTF-8, truncated or split frames, `\r` placement, ids at the edge of the closed id domain, arguments at schema limits, unknown keys, deep nesting | stdout bytes, exit code, store class and dump (§5.2) |
-| CLI argv, stdin and env | Seeded mutations from the R2d scenarios: integer tokens over the frozen tables, option permutations, profile JSON mutations (as in `decode-errors.json`), confirmation bytes | exit code, stdout and stderr (last-line prefix for usage errors), file tree under §5.2 |
-| Kernel library API (TS module vs Python module, same process model as the R2b writes corpus) | Seeded intake proposals and evidence lists, including the R2b carry: present-null, non-string, nested and oversized evidence metadata | the outcome (typed error `Name: message`, or success) and the dump |
+| MCP framing and dispatch (in-process serve harness, both runtimes) | Seeded mutations of the R2c corpus transcripts: byte flips, invalid UTF-8, `\r` placement, ids at the edge of the closed id domain, arguments at schema limits, unknown keys, nesting. **Each case carries an explicit `chunks: [bytes…]` partition** that is fed exactly to both harnesses (F3). | Output bytes, store class and dump (§5.2) |
+| MCP real subprocess stdin | A fixed set of transport smokes (split writes, a final frame at EOF). These are kept separate from the chunk-partitioned fuzz. | stdout bytes, exit code |
+| CLI argv, stdin and env | Seeded mutations of the R2d scenarios: integer tokens over the frozen tables, option permutations, profile JSON mutations, confirmation bytes | Exit code, stdout and stderr (last-line prefix for usage errors), and the file tree under §5.2 |
+| Kernel library API (TS module versus Python module, the same process model as the R2b writes corpus) | Seeded intake proposals and evidence lists, including the R2b carry: present-null, non-string, nested and oversized evidence metadata | Outcome (`Name: message` or success) and dump |
 
-### 3.2 Determinism
+**Generation caps (F3).** Every generator enforces hard caps, recorded in the corpus metadata:
+- MCP: at most 64 KiB per case, nesting depth at most 32, and at most 16 frames per case.
+- CLI: at most 8 KiB of argv plus stdin per case.
+- Kernel: at most 64 KiB per proposal and at most 32 evidence items.
+- Every boundary has a fixed number of cases per seed.
+
+Within these caps, Z stays a differential protocol test. It does not turn into stack or memory stress outside the contract.
+
+### 3.2 Determinism and budgets (Q3)
 
 - The Python oracle produces the expected outcome for every generated case.
-- Generators are pure functions of `(seed, index)`, and the seed list lives in the repo.
-- CI runs a fixed budget: 2,000 MCP, 2,000 CLI and 5,000 kernel cases per OS, inside a time box set by Q3.
-- A nightly job (Q3) runs larger budgets with rotating seeds and files any mismatch as a minimized repro.
+- Generators are pure functions of `(seed, index)`.
+- **Fixed CI budgets are the contract:** per OS, 2,000 MCP cases, 2,000 CLI cases and 5,000 kernel cases. Every case must finish. The job timeout (about 10 minutes) is only a failure bound and never means stopping early.
+- **Nightly run.** It uses larger budgets and rotating seeds. Each seed comes from a checked-in seed ring, or is derived from the UTC date with a fixed salt. The actual seeds are always written to the job log and the artifact.
 
-### 3.3 Mismatch handling
+### 3.3 Mismatch handling (zero tolerance)
 
-- A mismatch is never accepted as a tolerance.
-- Each mismatch is minimized and committed as a new corpus case in the right corpus (`golden-mcp-v1`, `golden-cli-v1` or `golden-writes-v5`). It is then fixed in TS, or, if Python's behavior is undefined or unsafe, an oracle patch is declared like P6–P14.
-- Corpus additions follow the existing three-seed regeneration rule.
+The path for every mismatch is:
 
-### 3.4 P15 — kernel evidence metadata law (oracle patch, proposed)
+> mismatch → deterministic minimization → reviewable repro artifact → corpus regression → fix
 
-The R2b carry is a real divergence today:
-- Python binds `evidence.get("source_ref", "")` as is. A present `null` fails `NOT NULL` with `sqlite3.IntegrityError`, an integer is coerced by `TEXT` affinity, and a dict raises a binding error.
-- TS uses `String(x ?? "")`. A `null` becomes `""` and a dict becomes `"[object Object]"`.
+- **The fix.** It goes into TS, or into a declared oracle patch if Python's behavior is undefined or unsafe.
+- **Corpus additions.** These are reviewed source changes that follow the existing three-seed regeneration rule. Nightly jobs and bots **never** commit a corpus case on their own.
 
-Proposal (Q1):
-- Before any write, both runtimes validate the evidence metadata fields: `evidence_type`, `source_ref`, `source_family`, `independence_group`, `captured_at`, `actor`, `surface`, `model_family`, `content_summary`, `privacy_class` and `identity_version`.
-- Each must be absent or a string. Anything else raises `ValueError("evidence.<field> must be a string")`.
-- `confidence` follows the existing numeric rule.
+### 3.4 P15: evidence metadata law (oracle patch, both runtimes; Q1)
 
-Z first maps which public surfaces can reach these fields. If none can (MCP's P7 validator and the CLI may already block every route), P15 is still applied so that the library API stops diverging. The writes corpus gets one case per field per kind.
+**Today the two runtimes diverge.**
+- Python binds `evidence.get("source_ref", "")` exactly as given:
+  - a present `null` fails `NOT NULL` with `sqlite3.IntegrityError`;
+  - an integer is coerced by `TEXT` affinity;
+  - a dict raises a binding error.
+- TS uses `String(x ?? "")`: `null` becomes `""` and a dict becomes `"[object Object]"`.
 
-### 3.5 P16 — busy and locked mapping (only if §2.3 finds a divergence)
+**The law.** Each of these fields must be **absent or a string**:
+- `evidence_type`, `source_ref`, `source_family`, `independence_group`, `captured_at`;
+- `actor`, `surface`, `model_family`, `content_summary`, `privacy_class`, `identity_version`.
 
-If the concurrent runs show the two runtimes reporting a busy or locked database differently, P16 defines one public error for it (name and message) in both runtimes. Until then, nothing changes.
+A present `null`, bool, int, float, array or object raises `ValueError("evidence.<field> must be a string")`.
 
-## 4. M — migration rehearsal on a copy of a real store
+**Not covered by P15.**
+- `source_payload` is intentionally JSON-valued and takes part in hashing.
+- `confidence` keeps its existing numeric law.
 
-### 4.1 Safety and privacy (hard rules)
+**Order.**
+- The P5 `requireWritable()` check stays first.
+- Existing replay, no-op and idempotency semantics are unchanged.
+- The check runs immediately before evidence canonicalization and insertion. It is not a new entry precondition, and it does not bypass the frozen writer-entry or replay behavior.
 
-- **Only the owner (Ty) touches the real store.** She makes the copy herself while no MCP server is writing: quit the clients, then use the SQLite online backup (`sqlite3 <real> ".backup <copy>"`) or a plain file copy when there is no `-wal` or `-shm`. The copy goes into a rehearsal folder she chooses, outside every repo.
+**Tests.**
+- The writes corpus gets one case per field per invalid kind.
+- One regression reuses an **existing idempotency key with new, invalid evidence metadata**. It proves that P15 neither fixes G1 nor changes replay precedence. Whatever the frozen replay path returns today, it still returns.
+
+Z also maps which public surfaces can reach these fields. P15 applies even if only the library API can reach them.
+
+### 3.5 P16: busy and locked (mandatory if triggered; F2)
+
+P16 becomes mandatory if §2.3 or Z shows **either** of these:
+- Python and TS report a busy or locked database differently;
+- **either** runtime reports busy or locked as an untyped or internal crash, even if both runtimes fail in the same bad way.
+
+P16 then defines a single public error (name and message) for that condition in both runtimes, adds it to the P13 public set, and pins it with a corpus case. If neither trigger appears, nothing changes.
+
+## 4. M: migration rehearsal on a copy of a real store
+
+### 4.1 Safety and privacy (hard rules; F4, F5)
+
+**The owner's copy.** Only the owner (Ty) touches a real store.
+- She makes each copy herself, while no MCP server is writing. She quits the clients, then runs `sqlite3 <real> ".backup <copy>"`, or does a plain file copy when there is no `-wal` or `-shm`.
+- The copy goes into a rehearsal folder she chooses, outside every repo. It is **immutable input** to the runner.
 - Codex and Aux never read, list or open a real store path, and never receive one in a brief or a message.
-- The rehearsal runner:
-  - refuses any input that is not inside the rehearsal folder;
-  - works on further copies of that copy, never on the copy itself;
-  - uses the R2d §4 allowlist env.
-- The output is a **report with no content**: per step, the runtime, the state, the exit code, counts (records, revisions, evidence rows, relations, cues, receipts), the seven `doctor` checks, and SHA-256 values of the dumps, schema records and outputs. It contains no record text, ids, cues or file paths beyond the rehearsal-relative ones.
-- Nothing from the rehearsal is committed, uploaded or pasted, except that report. Ty deletes the rehearsal folder when done.
 
-### 4.2 Steps (each in both runtimes, on independent copies)
+**The runner's containment** is at least as strict as R2d:
+- Every input, further copy, target and backup is resolved with `realpath` and must be contained in the selected rehearsal root. Symlink escapes are rejected.
+- The source copy must be a regular file, with `nlink == 1` where the platform reports it.
+- The source copy is hashed and `stat`-ed before and after the run, and must be unchanged.
+- Every mutation happens only on further copies inside the rehearsal folder.
+- The env is built from an explicit allowlist (R2d §4), with no inherited proxy or network configuration.
 
-1. `doctor` (it must not initialize).
+**The report.** It contains counts and hashes only:
+- per step: the runtime, the state, the exit code, and counts (records, revisions, evidence rows, relations, cues, receipts);
+- the seven `doctor` checks;
+- SHA-256 values of dumps, schema records and outputs.
+
+It never contains ids, titles, summaries, cue text, absolute paths, or any string derived from a record.
+
+**Cues.** Cues are identified by `cue_index` and a count. Their hashes never appear in the report, because a low-entropy cue could be brute-forced from a plain hash. If local correlation is needed, the runner uses an ephemeral keyed HMAC whose key stays local and is never written to the report.
+
+**After the run.** Nothing from the rehearsal is committed, uploaded or pasted, except the report. Ty deletes the rehearsal folder when she is done.
+
+### 4.2 Steps
+
+Each step runs in both runtimes, on independent further copies:
+1. `doctor`. It must not initialize the store.
 2. `migrate-to --dry-run`, then a real `migrate-to` (P14 order), then `doctor` on the target.
-3. Reads on the target: `status`, `timeline --limit 1000`, `core-proposals`, and `retrieve --readonly` for a fixed cue list. Ty supplies the cues locally; they are hashed in the report and never written out.
-4. One tracked `retrieve` and one `decay` on further copies of the migrated target.
-5. Cross-check: the Python-migrated target is read by TS, and the TS-migrated target is read by Python.
+3. Reads on the target: `status`, `timeline --limit 1000`, `core-proposals`, and `retrieve --readonly` for a cue list that Ty supplies locally.
+4. One tracked `retrieve` and one `decay`, each on a further copy of the migrated target.
+5. A cross-check: TS reads the Python-migrated target, and Python reads the TS-migrated target.
 
-Law:
-- Python and TS produce identical outputs per step (compared locally, byte for byte).
-- The dumps and schema records of the migrated targets are identical.
+The law:
+- The two runtimes produce identical outputs for each step. The bytes are compared locally.
+- The migrated targets have identical dumps and schema records.
 - Every `doctor` check passes on the targets.
 - The source copy and the backup obey P14 and §5.2.
 
-### 4.3 Which stores
+### 4.3 Which stores (Q2)
 
-Q2: Ty chooses which real stores to rehearse. The candidates are the Aux and Lam identity stores. The work stores (AWM, LWM) are out of scope until Phase 4.
+Only the Aux and Lam identity stores are rehearsed, and Ty makes every source copy. The work stores (AWM, LWM) are out of R3.
 
 ## 5. CI and deliverables
 
-- **CI, three OSes:**
-  - X §2.1, the fixed matrix and the seeded plans;
-  - X §2.2;
-  - Z, at the fixed budget.
-  - X §2.3, the concurrency runs, on Ubuntu and macOS (Windows file locking is covered by Q4).
-- **Corpora:** every minimized mismatch is added to the corpus it belongs to. Existing payloads never change, except through a declared oracle patch with its own new cases.
-- **Local only:** M produces `rehearsal-report.json`, with no content. Ty decides whether to share it with Lam and Aux.
-- **PR shape:** one PR for X and Z, with P15 and possibly P16. M is a runner plus a runbook (`docs/runbooks/r3-rehearsal.md`) in the same PR; the rehearsal itself is not run by CI.
+- **CI on all three OSes:** X §2.1, §2.2 and §2.3, plus Z at its fixed budgets.
+- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, or P16 if it is triggered) that comes with its own new cases.
+- **Local only:** M produces `rehearsal-report.json` (counts and hashes, §4.1). Ty decides whether to share it.
+- **PR shape:** one implementation PR covers X, Z, P15 (and P16 if triggered), the M runner, and `docs/runbooks/r3-rehearsal.md`. CI never runs the rehearsal itself.
 
-## 6. Questions for Lam
+## 6. Settlement (Lam, 2026-10-07, review @ f2ac000)
 
-- **Q1 — P15 now?** Make the evidence metadata law an oracle patch in R3 even if no public surface reaches it. Recommended: yes, since the library API is part of the product.
-- **Q2 — rehearsal stores:** the Aux and Lam identity stores only, with Ty making the copies. Recommended: yes.
-- **Q3 — budgets:** a CI fuzz time box of about 10 minutes per OS job, plus a nightly rotating-seed job. Recommended: yes.
-- **Q4 — concurrency on Windows:** run §2.3 on Windows too, or limit it to POSIX and keep Windows to sequential X? Recommended: run it on Windows as well. Windows locking is the case most likely to differ.
-- **Q5 — concurrency law:** is "equals some sequential order of the committed steps, checked by replaying in commit-sequence order" strong enough, or should every subset of interleavings be enumerated for small M? Recommended: the replay law, plus an exhaustive check for M ≤ 3.
+- **Q1, yes:** P15 is in scope even if only the library API reaches it. It excludes `source_payload`, keeps `confidence` numeric, keeps P5 first, runs just before canonicalization, and has a G1 replay-precedence regression.
+- **Q2, yes:** the Aux and Lam identity stores only, with Ty making every source copy.
+- **Q3, yes:** the fixed budgets are the contract, the time box is only a timeout, the nightly seeds are reproducible and logged, and nothing is ever committed automatically.
+- **Q4, yes:** the concurrency runs include Windows.
+- **Q5, changed:** commit order is proven by a serializability search under program order and real-time happens-before, exhaustive for M ≤ 3. A log written after each operation returns is diagnostic only.
+- **F1:** the `kill -9` law depends on the crash class, and the frozen R2b intermediate states of G9, G10 and G12 are preserved.
+- **F2:** P16 is triggered by a divergence **or** by any untyped busy or locked failure.
+- **F3:** MCP fuzz cases carry explicit chunk partitions, and every generator has hard caps.
+- **F4:** the rehearsal runner's containment is at least as strict as R2d, and the source copy is immutable.
+- **F5:** the report contains no cue hash, only indices and counts, with an optional local HMAC.
