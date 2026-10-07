@@ -15,7 +15,7 @@ R2a–R2d proved that each TS surface matches the Python oracle **one runtime at
 **Out of scope**
 - **R2e:** `view` and `plugin`. `import-aml` stays Python-only until R4.
 - **R4:** the installer, the cutover, the single version source (0.4.0 versus 0.1.0), G13 and G14.
-- **Frozen gaps:** G1–G14 stay frozen, and G15 (§3.6) is added frozen. P15 (§3.4) does not change them, as its regression test proves.
+- **Frozen gaps:** G1–G14 stay frozen. P15 (§3.4) does not change them, as its regression test proves.
 
 ## 1. Comparison law (reused)
 
@@ -212,16 +212,34 @@ P16 then defines a single public error (name and message) for that condition in 
 
 **Law.** "Inherits the source mtime" means
 `floor(backup.mtime_ns / 1000) == floor(source.mtime_ns / 1000)`,
-that is, the same whole microsecond. It applies only to the `migrate-to` backup, and atime is not compared.
-- Python is unchanged: `copy2` satisfies the law already.
-- TS reads the source with `statSync(path, { bigint: true })` and sets the time to the **middle** of the source microsecond, `sec + (µs·1000 + 500) / 1e9`. That keeps double rounding away from the microsecond boundary: 20,000 random times on Linux and Node 22 all landed on the correct microsecond.
-- TS then reads the backup's mtime back. If the microsecond differs, it raises an internal error rather than leaving a backup that breaks the law.
+that is, the same whole microsecond. It applies only to the `migrate-to` backup, and atime is not compared. Python's `copy2` may keep a finer value; only the microsecond is compared.
 
-**Pre-epoch sources (G15, frozen).** Node replaces a negative numeric time with the current time, so TS cannot set a pre-1970 mtime. A store this product wrote cannot realistically carry such an mtime. Even so, TS checks the source mtime **before writing anything**: if it is earlier than the Unix epoch, TS raises `ValueError("source mtime predates the Unix epoch")`. No backup or target is created, and the source is untouched. Python's `copy2` would succeed on the same file. This known divergence is recorded as G15 and left for R4. One regression test sets a pre-epoch mtime on a synthetic copy and checks that TS refuses and that Python copies it.
+**Common supported domain (oracle patch, both runtimes).** Backup inheritance is defined only for a source mtime with `0 ≤ mtime_ns < 2^32 · 10^9`, that is, from the Unix epoch up to just before 2106-02-07 06:28:16 UTC. Below 2^32 s a binary64 value has a spacing under 0.5 µs, which leaves a safe margin around the +500 ns midpoint used below. Above it some microseconds cannot be represented at all; at 2^33 s the spacing is about 1.9 µs.
+- Both runtimes check the source mtime **before writing anything**. Outside the domain they raise the same public `ValueError("source mtime is outside the supported backup range")`. The source is untouched, and neither a backup nor a target exists.
+- There is no Python/TS divergence here, and no new gap. R4 may lift the bound if Node gains a nanosecond time API.
+
+**Setting the backup mtime.**
+- Python keeps `copy2`.
+- TS reads the source with `statSync(path, { bigint: true })` and sets the time to the **middle** of the source microsecond, `sec + (µs·1000 + 500) / 1e9`, so double rounding stays away from the microsecond boundary.
+
+**Verification and cleanup (both runtimes).** Setting the time and reading it back are part of creating a *valid* backup.
+- After the copy, both runtimes read the backup's mtime back and check the microsecond.
+- If the time cannot be set, or the read-back does not match (for example on a filesystem whose time resolution is coarser than 1 µs), the invocation:
+  - deletes the backup it just created;
+  - leaves no target;
+  - leaves the source unchanged in bytes and `stat`;
+  - raises the public `ValueError("backup mtime could not be preserved to a microsecond")`, never an untyped error.
+- This check runs before the post-backup alias check (P14 step 6) and before the migration block.
+
+**Evidence and proof.** In the container, 20,000 random modern times on Linux with Node 22 all landed on the correct microsecond. That is supporting evidence only. The proof is the boundary tests and the read-back verification.
 
 **Unaffected.** The `unchanged` class (R2d §5.2) still compares the runner's own before and after `stat` exactly. No runtime ever writes those times, so nothing is lost there.
 
-**Tests.** Regressions with nanosecond-precise source mtimes, including values just below and just above a microsecond boundary, on all three OSes. The R2d corpus fixtures with whole-second mtimes stay as they are.
+**Tests (all three OSes for the real-precision cases).**
+- Modern nanosecond source values: exactly on a microsecond boundary, then +1 ns, +499 ns, +500 ns, +999 ns, and the last nanosecond before the next microsecond.
+- Domain edges: the epoch exactly, the last supported nanosecond, the first unsupported value, and a pre-epoch value where the host can create one. Each must raise the same `ValueError` in both runtimes, with no side effect.
+- Verification failure: an injected fault at the time-set or read-back seam, after the backup exists. The test asserts that the source is exact, the backup is gone, the target is absent, and the public error is raised. It runs in both runtimes.
+- The R2d corpus fixtures with whole-second mtimes stay as they are.
 
 ## 4. M: migration rehearsal on a copy of a real store
 
@@ -313,4 +331,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ bef36ce (pending Lam's ack):** a backup inherits its source mtime at microsecond resolution (§3.6).
+- **Codex @ bef36ce, settled with Lam @ c6309c5:**
+  - a backup inherits its source mtime to the same microsecond (§3.6);
+  - a common supported domain, [epoch, 2^32 s), is a both-runtime oracle patch, so there is no G15;
+  - the post-copy read-back runs in both runtimes, with cleanup and a public `ValueError`.
