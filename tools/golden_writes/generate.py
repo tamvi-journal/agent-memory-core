@@ -22,8 +22,8 @@ from tools.golden.generate import clock_context, dump_database, legacy_v2, legac
 from trajecta_identity import IdentityMemory, load_profile  # noqa: E402
 from trajecta_identity.identity import PINNED  # noqa: E402
 
-ORACLE_BASE_COMMIT = "bb86dbf0e6ffc968d6320a91705dc9b4f629dd15"
-ORACLE_SEMANTICS = ["R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck"]
+ORACLE_BASE_COMMIT = "fa21042533826fcfa18bed97f5328166723fcbfa"
+ORACLE_SEMANTICS = ["R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck", "P15-evidence-metadata"]
 TABLES = ROOT / "memory_core" / "tables"
 LEGACY_V4 = ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3"
 SOURCES = (
@@ -82,7 +82,33 @@ def proposal(record_id: str, key: str, *, operation="create", record_class="beli
 
 def scripts() -> dict[str, dict[str, Any]]:
     base = [{"call": "bootstrap", "save": "boot"}]
+    metadata_fields = (
+        "evidence_type", "source_ref", "source_family", "independence_group",
+        "captured_at", "actor", "surface", "model_family", "content_summary",
+        "privacy_class", "identity_version",
+    )
+    create_args = {
+        "record_id": "p15", "record_class": "belief", "domain": "fact",
+        "title": "P15", "actor": "golden", "reason": "metadata contract",
+        "idempotency_key": "p15",
+    }
     return {
+        "evidence-metadata-p15": {"actions": [
+            {"call": "initialize"},
+            *[{"call": "create_current", "arguments": {
+                **create_args, "evidence": {field: value},
+            }, "expect_error": "ValueError"}
+              for field in metadata_fields for value in (None, True, 1, 1.0, [], {})],
+        ]},
+        "evidence-replay-p15": {"actions": [
+            {"call": "initialize"},
+            {"call": "create_current", "arguments": {
+                **create_args, "evidence": {"source_ref": "golden:p15-original"},
+            }},
+            {"call": "create_current", "arguments": {
+                **create_args, "evidence": {field: None for field in metadata_fields},
+            }},
+        ]},
         "bootstrap": {"actions": [*base, {"call": "bootstrap"}, {"call": "bootstrap_invalid", "expect_error": "ValueError"}]},
         "phase": {"actions": [
             *base,
@@ -225,6 +251,7 @@ def resolve_special(value: Any, mem: IdentityMemory) -> Any:
 def invoke(mem: IdentityMemory, call: str, args: dict[str, Any]):
     args = resolve_special(args, mem)
     if call == "initialize": return mem.store.initialize()
+    if call == "create_current": return mem.store.create_current(**args)
     if call == "bootstrap": return mem.bootstrap()
     if call == "bootstrap_invalid":
         bad = dataclasses.replace(mem.profile, core={**mem.profile.core, "falsifier": ""})

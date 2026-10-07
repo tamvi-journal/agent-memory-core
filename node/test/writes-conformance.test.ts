@@ -167,6 +167,17 @@ function invoke(memory: IdentityMemory, call: string, raw: any) {
   switch (call) {
     case "initialize":
       return memory.store.initialize();
+    case "create_current":
+      return memory.store.createCurrent({
+        recordId: args.record_id,
+        recordClass: args.record_class,
+        domain: args.domain,
+        title: args.title,
+        actor: args.actor,
+        reason: args.reason,
+        evidence: args.evidence,
+        idempotencyKey: args.idempotency_key,
+      });
     case "bootstrap":
       return memory.bootstrap();
     case "bootstrap_invalid": {

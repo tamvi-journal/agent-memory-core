@@ -50,6 +50,22 @@ export function semanticHash(value: Record<string, unknown>): string {
 }
 
 export function insertEvidence(store: MemoryStore, db: DatabaseSync, source: Evidence): string {
+  for (const field of [
+    "evidence_type",
+    "source_ref",
+    "source_family",
+    "independence_group",
+    "captured_at",
+    "actor",
+    "surface",
+    "model_family",
+    "content_summary",
+    "privacy_class",
+    "identity_version",
+  ]) {
+    if (Object.hasOwn(source, field) && typeof source[field] !== "string")
+      throw new ValueError(`evidence.${field} must be a string`);
+  }
   // Python stores evidence.get("source_ref", "") as given (unstripped).
   const sourceRef = String(source.source_ref ?? "");
   const {

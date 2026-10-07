@@ -1489,6 +1489,13 @@ class MemoryStore:
     def _insert_evidence(
         conn: sqlite3.Connection, evidence: dict[str, Any]
     ) -> str:
+        for field in (
+            "evidence_type", "source_ref", "source_family", "independence_group",
+            "captured_at", "actor", "surface", "model_family", "content_summary",
+            "privacy_class", "identity_version",
+        ):
+            if field in evidence and not isinstance(evidence[field], str):
+                raise ValueError(f"evidence.{field} must be a string")
         identity = canonical_evidence_identity(evidence)
         evidence_id = (
             f"evidence:{identity['identity_version']}:"
