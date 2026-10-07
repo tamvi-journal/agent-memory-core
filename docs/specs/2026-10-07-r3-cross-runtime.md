@@ -15,7 +15,7 @@ R2a–R2d proved that each TS surface matches the Python oracle **one runtime at
 **Out of scope**
 - **R2e:** `view` and `plugin`. `import-aml` stays Python-only until R4.
 - **R4:** the installer, the cutover, the single version source (0.4.0 versus 0.1.0), G13 and G14.
-- **Frozen gaps:** G1–G14 stay frozen. P15 (§3.4) does not change them, as its regression test proves.
+- **Frozen gaps:** G1–G14 stay frozen, and G15 (§3.6) is added frozen. P15 (§3.4) does not change them, as its regression test proves.
 
 ## 1. Comparison law (reused)
 
@@ -216,6 +216,8 @@ that is, the same whole microsecond. It applies only to the `migrate-to` backup,
 - Python is unchanged: `copy2` satisfies the law already.
 - TS reads the source with `statSync(path, { bigint: true })` and sets the time to the **middle** of the source microsecond, `sec + (µs·1000 + 500) / 1e9`. That keeps double rounding away from the microsecond boundary: 20,000 random times on Linux and Node 22 all landed on the correct microsecond.
 - TS then reads the backup's mtime back. If the microsecond differs, it raises an internal error rather than leaving a backup that breaks the law.
+
+**Pre-epoch sources (G15, frozen).** Node replaces a negative numeric time with the current time, so TS cannot set a pre-1970 mtime. A store this product wrote cannot realistically carry such an mtime. Even so, TS checks the source mtime **before writing anything**: if it is earlier than the Unix epoch, TS raises `ValueError("source mtime predates the Unix epoch")`. No backup or target is created, and the source is untouched. Python's `copy2` would succeed on the same file. This known divergence is recorded as G15 and left for R4. One regression test sets a pre-epoch mtime on a synthetic copy and checks that TS refuses and that Python copies it.
 
 **Unaffected.** The `unchanged` class (R2d §5.2) still compares the runner's own before and after `stat` exactly. No runtime ever writes those times, so nothing is lost there.
 
