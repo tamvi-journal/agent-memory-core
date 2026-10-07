@@ -204,6 +204,23 @@ P16 then defines a single public error (name and message) for that condition in 
   - The §2.3 concurrency law then accepts `StoreBusy` as the only public busy outcome.
   - Only for that canonical `SQLITE_BUSY` corpus scenario, where the holder outlasts the configured timeout, the wait is smoke-checked as `≥ 4.5 s`. This bound is never asserted for `SQLITE_LOCKED` or for extended-code paths.
 
+### 3.6 Backup mtime resolution (Codex @ bef36ce; amends R2d §3.7 and §5.2)
+
+**Finding.** X found that a TS `migrate-to` backup does not reproduce the source mtime to the nanosecond. Example: a source with `mtime_ns = 1700000000123456789` gave a TS backup of `…122999000`. TS passed millisecond `Date`s to `utimesSync`. Python's `copy2` keeps every nanosecond.
+
+**Platform limit.** Node cannot set file times to the nanosecond. `fs.utimes*` takes a double in seconds, and on Linux it lands at microsecond resolution. Exact nanosecond inheritance is therefore impossible for TS. This is a limit of the platform, not a bug to tolerate.
+
+**Law.** "Inherits the source mtime" means
+`floor(backup.mtime_ns / 1000) == floor(source.mtime_ns / 1000)`,
+that is, the same whole microsecond. It applies only to the `migrate-to` backup, and atime is not compared.
+- Python is unchanged: `copy2` satisfies the law already.
+- TS reads the source with `statSync(path, { bigint: true })` and sets the time to the **middle** of the source microsecond, `sec + (µs·1000 + 500) / 1e9`. That keeps double rounding away from the microsecond boundary: 20,000 random times on Linux and Node 22 all landed on the correct microsecond.
+- TS then reads the backup's mtime back. If the microsecond differs, it raises an internal error rather than leaving a backup that breaks the law.
+
+**Unaffected.** The `unchanged` class (R2d §5.2) still compares the runner's own before and after `stat` exactly. No runtime ever writes those times, so nothing is lost there.
+
+**Tests.** Regressions with nanosecond-precise source mtimes, including values just below and just above a microsecond boundary, on all three OSes. The R2d corpus fixtures with whole-second mtimes stay as they are.
+
 ## 4. M: migration rehearsal on a copy of a real store
 
 ### 4.1 Safety and privacy (hard rules; F4, F5)
@@ -294,3 +311,4 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ bef36ce (pending Lam's ack):** a backup inherits its source mtime at microsecond resolution (§3.6).
