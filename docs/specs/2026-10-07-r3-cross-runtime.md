@@ -26,7 +26,11 @@ Every comparison reuses a settled law:
   - a `written` store is compared by its R0 dump plus its schema record, with no sidecar left behind;
   - an `unchanged` store keeps its exact bytes, its sidecar inventory, its `mtime` and its mode.
 
-R3 adds **no** tolerance. A case that seems to need one is a stop-and-report.
+The only tolerance carried into R3 is the settled R2b §6 **decay whitelist**. It covers the maintenance adjustment `new_value` and the resulting `accessibility` of the adjusted records, compared record by record with |Δ| ≤ 1e-6. Everything else is exact.
+
+It applies wherever a run includes `decay`: in X, in Z and in M. Any generated plan or case that contains `decay` must pass the R2b margin check, which the Python oracle runs when the case is generated. A case whose decay value lies within 1e-9 of a decision boundary (the 1e-6 threshold or a `round6` half-way point) is rejected and regenerated.
+
+R3 adds **no** other tolerance. A case that seems to need one is a stop-and-report.
 
 Every independent run starts from a **fresh, identical fixture**. Mutable stores are never reused between a baseline run and a mixed run. Runs may share exactly the same injected clock values.
 
@@ -86,9 +90,14 @@ Each operation is recorded with two times on a shared monotonic clock:
 The law has four parts:
 1. **Every step commits or fails with a public typed error.** Busy and locked conditions follow P16 (§3.5).
 2. **The final store passes** all seven `doctor` checks.
-3. **Serializability.**
+3. **Serializability at transaction boundaries.**
+   - The serial unit is a **committed transaction**, not a public operation. Compound operations are split into their committed sub-transactions, in the order the frozen R2b behavior defines:
+     - G10 `log_phase` and `log_fact`: the submit, then each relation or cue commit;
+     - G12 tracked `retrieve`: each `record_access` commit, then `apply_recall`;
+     - G9 `decay`: the maintenance commit. The sidecar write is not part of the DB state.
+   - Another process's transaction may fall between two sub-transactions of one operation.
    - A candidate serial order must respect each process's program order and the real-time happens-before relation: if op a returned before op b was invoked, a comes before b.
-   - For **M ≤ 3**, every such serial order is enumerated. The final dump must equal the dump of at least one of them, each replayed from a fresh fixture in Python.
+   - For **M ≤ 3 operations per process**, every serial order of their sub-transactions is enumerated (sub-transaction order within each operation kept). The final dump must equal the dump of at least one of them, each replayed from a fresh fixture in Python.
    - For **M > 3**, a search finds **one** order that satisfies those constraints and the store-local ordering evidence (the per-record lifecycle and relation sequence numbers, and the receipt states). That order is replayed in Python, and the final dump must match.
    - A log the harness writes after each operation returns is **diagnostic only**. It is never the proof of commit order.
 4. **No sidecar remains** after both processes exit.
@@ -200,10 +209,12 @@ Each step runs in both runtimes, on independent further copies:
 2. `migrate-to --dry-run`, then a real `migrate-to` (P14 order), then `doctor` on the target.
 3. Reads on the target: `status`, `timeline --limit 1000`, `core-proposals`, and `retrieve --readonly` for a cue list that Ty supplies locally.
 4. One tracked `retrieve` and one `decay`, each on a further copy of the migrated target.
+
+**Clock.** Both runtimes get the **same injected clock sequence** (the clock injection already used by the R2b–R2d corpora), so clock-derived timestamps, access ids and decay run ids match. With wall-clock time, two correct runs would diverge.
 5. A cross-check: TS reads the Python-migrated target, and Python reads the TS-migrated target.
 
 The law:
-- The two runtimes produce identical outputs for each step. The bytes are compared locally.
+- The two runtimes produce identical outputs for each step. The bytes are compared locally, with the decay whitelist of §1.
 - The migrated targets have identical dumps and schema records.
 - Every `doctor` check passes on the targets.
 - The source copy and the backup obey P14 and §5.2.
@@ -231,3 +242,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **F3:** MCP fuzz cases carry explicit chunk partitions, and every generator has hard caps.
 - **F4:** the rehearsal runner's containment is at least as strict as R2d, and the source copy is immutable.
 - **F5:** the report contains no cue hash, only indices and counts, with an optional local HMAC.
+- **Codex review @ a3c14b3 (needs Lam's ack):**
+  - the concurrency law serializes committed sub-transactions (G9, G10, G12);
+  - M uses one injected clock sequence for both runtimes;
+  - the R2b decay whitelist and margin check apply wherever `decay` runs.
