@@ -83,6 +83,8 @@ The plans come from two sources:
 
 Two processes, one per runtime, write the same store at the same time. Each runs M steps, with at least 3 seeds. This runs on Ubuntu, macOS **and Windows**.
 
+**`decay` is excluded from concurrent plans.** A concurrent `decay` has two independent linearization points: the DB maintenance transaction and the later activation-sidecar write. Two processes can commit the DB in one order and overwrite the sidecar in the other order. Modeling that would need a separate sidecar-history law, and that is the G9 atomicity problem, which stays frozen beyond R3. `decay` remains covered by sequential X (§2.1), crash X (§2.2), Z and M.
+
 Each operation is recorded with two times on a shared monotonic clock:
 - `invoke_ts`, taken just before the operation is issued;
 - `return_ts`, taken just after it returns.
@@ -94,13 +96,12 @@ The law has four parts:
    - The serial unit is a **committed transaction**, not a public operation. Compound operations are split into their committed sub-transactions, in the order the frozen R2b behavior defines:
      - G10 `log_phase` and `log_fact`: the submit, then each relation or cue commit;
      - G12 tracked `retrieve`: each `record_access` commit, then `apply_recall`;
-     - G9 `decay`: the maintenance commit. The sidecar write is not part of the DB state.
    - Another process's transaction may fall between two sub-transactions of one operation.
    - A candidate serial order must respect each process's program order and the real-time happens-before relation: if op a returned before op b was invoked, a comes before b.
    - For **M ≤ 3 operations per process**, every serial order of their sub-transactions is enumerated (sub-transaction order within each operation kept). The final dump must equal the dump of at least one of them, each replayed from a fresh fixture in Python.
    - For **M > 3**, a search finds **one** order that satisfies those constraints and the store-local ordering evidence (the per-record lifecycle and relation sequence numbers, and the receipt states). That order is replayed in Python, and the final dump must match.
    - A log the harness writes after each operation returns is **diagnostic only**. It is never the proof of commit order.
-4. **No sidecar remains** after both processes exit.
+4. **No transient SQLite sidecar** (`-wal`, `-shm`, `-journal`) remains after both processes exit. The activation sidecar (`<db stem>.activation.json`) cannot appear here, because concurrent plans contain no `decay`.
 
 ## 3. Z: differential fuzzing
 
@@ -202,22 +203,37 @@ It never contains ids, titles, summaries, cue text, absolute paths, or any strin
 
 **After the run.** Nothing from the rehearsal is committed, uploaded or pasted, except the report. Ty deletes the rehearsal folder when she is done.
 
-### 4.2 Steps
+### 4.2 Steps (depend on the source state)
 
-Each step runs in both runtimes, on independent further copies:
-1. `doctor`. It must not initialize the store.
-2. `migrate-to --dry-run`, then a real `migrate-to` (P14 order), then `doctor` on the target.
-3. Reads on the target: `status`, `timeline --limit 1000`, `core-proposals`, and `retrieve --readonly` for a cue list that Ty supplies locally.
-4. One tracked `retrieve` and one `decay`, each on a further copy of the migrated target.
+M is a **real-store compatibility rehearsal, plus a migration rehearsal when one applies**. Synthetic v2, v3 and v4 migrations are already covered by the corpora, so Ty never has to manufacture or downgrade a store to rehearse a migration.
 
 **Clock.** Both runtimes get the **same injected clock sequence** (the clock injection already used by the R2b–R2d corpora), so clock-derived timestamps, access ids and decay run ids match. With wall-clock time, two correct runs would diverge.
-5. A cross-check: TS reads the Python-migrated target, and Python reads the TS-migrated target.
+
+Every step runs in both runtimes, on independent further copies.
+
+1. **`doctor`** on a further copy of the source. It must not initialize the store. Record the state.
+2. **Branch on that state.**
+   - **`legacy-v2`, `legacy-v3` or `legacy-v4`:**
+     1. `migrate-to --dry-run`, then a real `migrate-to` (P14 order), then `doctor` on the target.
+     2. Reads on the target: `status`, `timeline --limit 1000`, `core-proposals`, and `retrieve --readonly` for a cue list Ty supplies locally.
+     3. One tracked `retrieve` and one `decay`, each on a further copy of the migrated target.
+     4. Cross-read: TS reads the Python-migrated target, and Python reads the TS-migrated target.
+   - **`ready` (schema v5):** no migration is invented.
+     1. On a further copy, pin the exact `migrate-to` refusal (`store state 'ready' is not an explicit migration source`), as a guardrail proof.
+     2. Run the same reads, the tracked `retrieve` and the `decay` directly on fresh further copies of the ready source.
+     3. Cross-runtime: a further copy written by one runtime (tracked `retrieve`, then `decay`) is read by the other.
+   - **`unknown`, `incompatible`, or a WAL source:** stop. The report records only the state or the refusal. Nothing is mutated.
 
 The law:
-- The two runtimes produce identical outputs for each step. The bytes are compared locally, with the decay whitelist of §1.
-- The migrated targets have identical dumps and schema records.
-- Every `doctor` check passes on the targets.
-- The source copy and the backup obey P14 and §5.2.
+- The two runtimes produce identical outputs for each step. Bytes are compared locally, with the decay whitelist of §1.
+- The stores each step writes have identical dumps and schema records.
+- Every `doctor` check passes on every ready store the rehearsal produces or uses.
+- On the legacy branch, the source copy and the backup obey P14 and §5.2.
+- The report follows §4.1 (counts and hashes only) on every branch. Whichever branch runs, the state is the only new field.
+
+**Acceptance.**
+- If at least one of Ty's sources is legacy, M also proves a real-store migration.
+- If every source is already ready (v5), M still proves real-store cross-runtime compatibility. R4 is **not** blocked just because no real legacy store remains.
 
 ### 4.3 Which stores (Q2)
 
@@ -246,3 +262,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
   - the concurrency law serializes committed sub-transactions (G9, G10, G12);
   - M uses one injected clock sequence for both runtimes;
   - the R2b decay whitelist and margin check apply wherever `decay` runs.
+  - Lam ACKed these @ b499ef1.
+- **Lam @ b499ef1:**
+  - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
+  - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
