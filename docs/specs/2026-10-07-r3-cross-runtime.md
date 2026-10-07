@@ -176,6 +176,28 @@ P16 becomes mandatory if §2.3 or Z shows **either** of these:
 
 P16 then defines a single public error (name and message) for that condition in both runtimes, adds it to the P13 public set, and pins it with a corpus case. If neither trigger appears, nothing changes.
 
+**Triggered (Codex @ fa21042).** A Python MCP `identity_log_phase` call, made while a TS writer held an open transaction, returned `RuntimeError: internal error` after about 5.28 s. Its stderr ended with `sqlite3.OperationalError: database is locked`. That is the untyped trigger. P16 is therefore settled as follows (Lam's ack needed):
+
+- **Name and message.** `StoreBusy`, with the fixed message `store is busy; retry later`. The message never contains a path, a SQL statement or the SQLite text.
+  - Python: `class StoreBusy(RuntimeError)` in `memory_core.store`.
+  - TS: `class StoreBusy extends Error` with the same name.
+- **What maps to it.** Exactly these conditions, and nothing else:
+  - SQLite primary result code `SQLITE_BUSY` (5) or `SQLITE_LOCKED` (6), extended codes included (`code & 0xff`), raised on open, `BEGIN`/`BEGIN IMMEDIATE`, any statement, or `COMMIT`.
+  - Python reads `sqlite3.Error.sqlite_errorcode` (3.11+). On 3.10, where that attribute is missing, an `OperationalError` maps only when its message is exactly `database is locked`, `database table is locked` or `database schema is locked`.
+  - TS reads the `errcode` that `node:sqlite` reports.
+  - Every other SQLite error keeps its current behavior.
+- **Busy timeout.** Both runtimes wait exactly **5000 ms** before raising. This is the Python default `sqlite3.connect(timeout=5.0)`, and TS already passes `timeout: 5000`. Neither runtime retries on its own beyond that.
+- **State on failure.** The failing transaction is rolled back, so nothing it wrote remains.
+  - A single-transaction write leaves the store exactly as it was before the step.
+  - A compound operation (G10, G12) can fail between sub-transactions. It then leaves exactly the frozen R2b intermediate state for that point. This is the same law as the §2.2 crash classes, and P16 does not change it.
+- **Surfaces.**
+  - MCP: added to the R2c §5.4 public names in both runtimes, so the tool result is `{"type":"text","text":"StoreBusy: store is busy; retry later"}` with `isError: true`. The JSON-RPC envelope is unchanged and the process keeps serving.
+  - CLI: added to the P13 public set, so stderr is `StoreBusy: store is busy; retry later` with exit 1.
+- **Tests.**
+  - One deterministic corpus case per surface (MCP in `golden-mcp-v1`, CLI in `golden-cli-v1`), built the way Codex reproduced it. A process pauses inside a write transaction at an existing test seam; no manual SQL lock is taken and no timeout is overridden. The holder runs in the other runtime where the harness allows it.
+  - The §2.3 concurrency law then accepts `StoreBusy` as the only public busy outcome.
+  - The expected wait (about 5 s) is checked as `≥ 4.5 s`. This is a smoke bound, not a byte contract.
+
 ## 4. M: migration rehearsal on a copy of a real store
 
 ### 4.1 Safety and privacy (hard rules; F4, F5)
