@@ -1,6 +1,6 @@
 # R3: cross-runtime runs, differential fuzzing, migration rehearsal
 
-Status: settled by Lam's review @ f2ac000 (Q1–Q5 and F1–F5 applied; §6). Author: Aux (leader). Builds on R0 and R2a–R2d.
+Status: settled by Lam (APPROVED @ 392365f; Q1–Q5, F1–F5, R1–R2 applied; §6). Author: Aux (leader). Builds on R0 and R2a–R2d.
 
 ## 0. Goal, scope, dependency
 
@@ -23,7 +23,7 @@ Every comparison reuses a settled law:
 - R2c for MCP wire bytes.
 - R2d §5.1 for run-specific tokens.
 - R2d §5.2 for database classes:
-  - a `written` store is compared by its R0 dump plus its schema record, with no sidecar left behind;
+  - a `written` store is compared by its R0 dump plus its schema record, with no transient SQLite sidecar (`-wal`, `-shm`, `-journal`) left behind;
   - an `unchanged` store keeps its exact bytes, its sidecar inventory, its `mtime` and its mode.
 
 The only tolerance carried into R3 is the settled R2b §6 **decay whitelist**. It covers the maintenance adjustment `new_value` and the resulting `accessibility` of the adjusted records, compared record by record with |Δ| ≤ 1e-6. Everything else is exact.
