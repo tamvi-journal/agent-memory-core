@@ -176,6 +176,34 @@ P16 becomes mandatory if §2.3 or Z shows **either** of these:
 
 P16 then defines a single public error (name and message) for that condition in both runtimes, adds it to the P13 public set, and pins it with a corpus case. If neither trigger appears, nothing changes.
 
+**Triggered (Codex @ fa21042).** A Python MCP `identity_log_phase` call, made while a TS writer held an open transaction, returned `RuntimeError: internal error` after about 5.28 s. Its stderr ended with `sqlite3.OperationalError: database is locked`. That is the untyped trigger. P16 is therefore settled as follows (Lam ACKed it in substance @ a86799b, with this timing correction):
+
+- **Name and message.** `StoreBusy`, with the fixed message `store is busy; retry later`. The message never contains a path, a SQL statement or the SQLite text.
+  - Python: `class StoreBusy(RuntimeError)` in `memory_core.store`.
+  - TS: `class StoreBusy extends Error` with the same name.
+- **What maps to it.** Exactly these conditions, and nothing else:
+  - SQLite primary result code `SQLITE_BUSY` (5) or `SQLITE_LOCKED` (6), extended codes included (`code & 0xff`), raised on open, `BEGIN`/`BEGIN IMMEDIATE`, any statement, or `COMMIT`.
+  - Python reads `sqlite3.Error.sqlite_errorcode` (3.11+). On 3.10, where that attribute is missing, an `OperationalError` maps only when its message is exactly `database is locked`, `database table is locked` or `database schema is locked`.
+  - TS reads the `errcode` that `node:sqlite` reports.
+  - Every other SQLite error keeps its current behavior.
+- **Busy timeout (configuration, not semantics).**
+  - Both runtimes configure a **5000 ms** SQLite busy timeout on every relevant connection: the Python default `sqlite3.connect(timeout=5.0)`, and TS `timeout: 5000`.
+  - Neither runtime adds an application-level retry beyond SQLite's own busy handling.
+  - Any `SQLITE_BUSY` or `SQLITE_LOCKED` result that reaches the runtime maps to `StoreBusy`, however much time has passed. SQLite may return `BUSY` without calling the busy handler (to avoid a deadlock, for example), and `LOCKED` is a different lock class.
+  - **Timing is not part of the `StoreBusy` contract.**
+- **State on failure.** The failing transaction is rolled back, so nothing it wrote remains.
+  - A single-transaction write leaves the store exactly as it was before the step.
+  - A compound operation (G10, G12) can fail between sub-transactions. It then leaves exactly the frozen R2b intermediate state for that point. This is the same law as the §2.2 crash classes, and P16 does not change it.
+- **Surfaces.**
+  - MCP: added to the R2c §5.4 public names in both runtimes, so the tool result is `{"type":"text","text":"StoreBusy: store is busy; retry later"}` with `isError: true`. The JSON-RPC envelope is unchanged and the process keeps serving.
+  - CLI: added to the P13 public set, so stderr is `StoreBusy: store is busy; retry later` with exit 1.
+- **Tests.**
+  - One deterministic corpus case per surface (MCP in `golden-mcp-v1`, CLI in `golden-cli-v1`), built the way Codex reproduced it. A process pauses inside a write transaction at an existing test seam. No manual SQL lock is taken and no timeout is overridden.
+  - The holder stays paused **until the victim has returned `StoreBusy`**, and only then is released. A fixed sleep is never used, because one could release the lock around 4.9 s and turn the expected error into a success.
+  - **A bidirectional proof** lives in X §2.3: a Python victim against a TS holder, and a TS victim against a Python holder.
+  - The §2.3 concurrency law then accepts `StoreBusy` as the only public busy outcome.
+  - Only for that canonical `SQLITE_BUSY` corpus scenario, where the holder outlasts the configured timeout, the wait is smoke-checked as `≥ 4.5 s`. This bound is never asserted for `SQLITE_LOCKED` or for extended-code paths.
+
 ## 4. M: migration rehearsal on a copy of a real store
 
 ### 4.1 Safety and privacy (hard rules; F4, F5)
