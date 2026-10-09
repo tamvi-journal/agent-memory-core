@@ -247,7 +247,14 @@ that is, the same whole microsecond. It applies only to the `migrate-to` backup,
 
 **Tests (all three OSes for the real-precision cases).**
 - Modern nanosecond source values: exactly on a microsecond boundary, then +1 ns, +499 ns, +500 ns, +999 ns, and the last nanosecond before the next microsecond.
-- Domain edges: the epoch exactly, the last supported nanosecond, the first unsupported value, and a pre-epoch value where the host can create one. Each must raise the same `ValueError` in both runtimes, with no side effect.
+- **Supported domain edges:** the epoch exactly (`mtime_ns = 0`) and the last supported nanosecond (`2^32·10^9 − 1`). For each, `migrate-to` proceeds through the normal legacy path:
+  - the backup is byte-identical to the source;
+  - its mtime matches the source to the whole microsecond;
+  - no range `ValueError` is raised.
+- **Unsupported domain edges:** the first unsupported value (`2^32·10^9`), and a pre-epoch value where the host can create one. For each, both runtimes:
+  - raise exactly `ValueError("source mtime is outside the supported backup range")`;
+  - leave the source law intact;
+  - create no backup and no target.
 - Verification failure: an injected fault at the time-set or read-back seam, after the backup exists. The test asserts that the source law holds, the backup is gone, the target is absent, and the public error is raised. It runs in both runtimes.
 - Order composition, in both runtimes, each with an unsupported mtime:
   - with an existing target → `FileExistsError(target)`;
@@ -346,7 +353,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ bef36ce, settled with Lam @ c6309c5:**
+- **Codex @ bef36ce, settled with Lam @ a4064ed (edge-test wording fixed):**
   - a backup inherits its source mtime to the same microsecond (§3.6);
   - a common supported domain, [epoch, 2^32 s), is a both-runtime oracle patch, so there is no G15;
   - the post-copy read-back runs in both runtimes, with cleanup and a public `ValueError`.
