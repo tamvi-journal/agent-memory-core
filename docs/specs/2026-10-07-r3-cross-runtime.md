@@ -353,7 +353,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ bef36ce, settled with Lam @ a4064ed (edge-test wording fixed):**
+- **Codex @ bef36ce, settled with Lam @ 5b6dd56:**
   - a backup inherits its source mtime to the same microsecond (§3.6);
   - a common supported domain, [epoch, 2^32 s), is a both-runtime oracle patch, so there is no G15;
   - the post-copy read-back runs in both runtimes, with cleanup and a public `ValueError`.
