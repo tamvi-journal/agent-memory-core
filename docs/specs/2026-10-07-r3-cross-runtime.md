@@ -71,12 +71,19 @@ The plans come from two sources:
 
 | Crash class | Law after the kill |
 |---|---|
-| Single-transaction kernel or authority write (intake submit, revise, relation event, receipt issue or consume) | The dump equals the state before the step or the state after it. Nothing in between. |
+| Single-transaction kernel or authority write (revise, relation event, receipt issue or consume) | The dump equals the state before the step or the state after it. Nothing in between. |
+| **G2** intake `submit` (Codex @ df5b755) | `submit` is **not** one transaction (G2, frozen since R0). It commits, in order: (1) evidence capture, (2) the received-intake row, (3) kernel materialization, (4) evidence linking, (5) the intake decision. A kill between commits leaves exactly the state after the last committed sub-transaction, for example +1 evidence row and +1 intake row with status `received`. Both runtimes must leave the **same** intermediate dump at every boundary. |
 | **G9** `decay` | The maintenance DB commit may exist while the activation sidecar is still stale or missing. This is the exact intermediate state frozen in R2b. |
 | **G10** `log_phase` / `log_fact` | The submit may be committed while some relations or cues are not. This is the exact intermediate state frozen in R2b. |
 | **G12** tracked `retrieve` | One or more `record_access` commits may exist while the remaining accesses and `apply_recall` do not. This is the exact intermediate state frozen in R2b. |
 
-- **G9, G10 and G12.** These are the crash law already frozen in R2b, not a new tolerance. For each of these classes, X asserts the exact intermediate state R2b defined. It then retries from the other runtime and proves the R2b semantics, including the non-converging retry of G12.
+- **G2, G9, G10 and G12.** These are the crash law already frozen in R0 and R2b, not a new tolerance.
+  - G10's first sub-transaction is the whole intake `submit`, which is itself the G2 sequence above.
+  - For each of these classes, X asserts the exact intermediate state at every boundary, identical in both runtimes.
+- **Retry law for every compound class.**
+  - After a kill at boundary k in runtime A, the same call is retried with the same arguments in runtime B.
+  - The resulting dump must equal the dump a **Python** retry produces from the same intermediate store.
+  - That retry follows the frozen G1 replay and idempotency behavior, whatever it is. It is not "fixed" here. This includes G12's non-converging retry.
 - **Every class:** the store passes the `doctor` ready checks after the kill and after the retry.
 
 ### 2.3 Concurrent access (Q4, Q5)
@@ -94,7 +101,8 @@ The law has four parts:
 2. **The final store passes** all seven `doctor` checks.
 3. **Serializability at transaction boundaries.**
    - The serial unit is a **committed transaction**, not a public operation. Compound operations are split into their committed sub-transactions, in the order the frozen R2b behavior defines:
-     - G10 `log_phase` and `log_fact`: the submit, then each relation or cue commit;
+     - G2 intake `submit`: evidence capture, received intake, materialization, evidence linking, decision;
+     - G10 `log_phase` and `log_fact`: the submit (itself the G2 sequence), then each relation or cue commit;
      - G12 tracked `retrieve`: each `record_access` commit, then `apply_recall`;
    - Another process's transaction may fall between two sub-transactions of one operation.
    - A candidate serial order must respect each process's program order and the real-time happens-before relation: if op a returned before op b was invoked, a comes before b.
@@ -203,6 +211,22 @@ P16 then defines a single public error (name and message) for that condition in 
   - **A bidirectional proof** lives in X §2.3: a Python victim against a TS holder, and a TS victim against a Python holder.
   - The §2.3 concurrency law then accepts `StoreBusy` as the only public busy outcome.
   - Only for that canonical `SQLITE_BUSY` corpus scenario, where the holder outlasts the configured timeout, the wait is smoke-checked as `≥ 4.5 s`. This bound is never asserted for `SQLITE_LOCKED` or for extended-code paths.
+
+### 3.5b P17: sequence allocation inside the write transaction (oracle patch, both runtimes)
+
+**Finding (Codex @ df5b755).** A deterministic public MCP schedule runs two `close-loop` calls on the same relation:
+- Python reads the active relation and computes `sequence_number = 2` **before** its deferred write transaction starts.
+- TS enters `BEGIN IMMEDIATE`, commits sequence 2, and returns `retracted`.
+- Python resumes and fails on `UNIQUE(relation_id, sequence_number)`, which surfaces as `RuntimeError: internal error`.
+
+Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. That breaks §2.3 law 1, and P16 cannot cover it, because these are constraint errors, not BUSY.
+
+**Law.** Every read-compute-write allocation of a per-record sequence number takes place **inside one `BEGIN IMMEDIATE` transaction** that starts before the read. This covers the relation event `sequence_number`, the revision `revision_number`, and every other MAX+1 or "current state" read that decides a write. TS already behaves this way, so the patch moves Python to the same boundary.
+- Codex lists every such site in both runtimes first: file, function, the read, and the write it decides. Then it patches only those sites.
+- **Not changed:** the compound boundaries of G2, G9, G10 and G12, the G1 replay behavior, and the public results of sequential calls. Every existing corpus payload stays byte-identical.
+- **Concurrent outcome.** The second caller waits on the lock. Within the busy timeout it then reads the committed state and returns that state's ordinary result, for example a typed "already closed" error or a valid sequence 3, exactly as a serial call would. If the wait exceeds the busy timeout, it returns `StoreBusy` (P16). A constraint error never reaches the public surface.
+
+**Tests.** The Codex schedules become deterministic regressions in both directions (Python victim / TS holder, and TS victim / Python holder) for `close-loop` and `revise`. Each result must equal one serial order (§2.3), with no `IntegrityError` and no untyped error.
 
 ### 3.6 Backup mtime resolution (Codex @ bef36ce; amends R2d §3.7 and §5.2)
 
@@ -353,6 +377,9 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ df5b755 (pending Lam's ack):**
+  - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
+  - P17, sequence allocation inside `BEGIN IMMEDIATE` (§3.5b).
 - **Codex @ bef36ce, settled with Lam @ 5b6dd56:**
   - a backup inherits its source mtime to the same microsecond (§3.6);
   - a common supported domain, [epoch, 2^32 s), is a both-runtime oracle patch, so there is no G15;
