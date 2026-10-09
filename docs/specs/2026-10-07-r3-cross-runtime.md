@@ -72,7 +72,7 @@ The plans come from two sources:
 | Crash class | Law after the kill |
 |---|---|
 | Single-transaction kernel or authority write (revise, relation event, receipt issue or consume) | The dump equals the state before the step or the state after it. Nothing in between. |
-| **G2** intake `submit` (Codex @ df5b755) | `submit` is **not** one transaction (G2, frozen since R0). It commits, in order: (1) evidence capture, (2) the received-intake row, (3) kernel materialization, (4) evidence linking, (5) the intake decision. A kill between commits leaves exactly the state after the last committed sub-transaction, for example +1 evidence row and +1 intake row with status `received`. Both runtimes must leave the **same** intermediate dump at every boundary. |
+| **G2** intake `submit` (Codex @ df5b755) | `submit` is **not** one transaction (G2, frozen since R0). Its commits depend on the evaluated outcome (Codex review on #26): **materialized path** — (1) evidence capture (one transaction for all items), (2) the received-intake row, (3) kernel materialization, (4) evidence linking, only when the result has a non-null `target_revision_id` (otherwise no commit), (5) the `materialized` decision; **`held` / `rejected` / `no_op` path** — (1) evidence capture, (2) the received-intake row, (3) the decision. The boundaries are exactly the commits that run on that path; X derives them from the Python oracle and never invents a boundary for a skipped step. A kill between commits leaves exactly the state after the last committed sub-transaction, for example +1 evidence row and +1 intake row with status `received`. Both runtimes must leave the **same** intermediate dump at every boundary. |
 | **G9** `decay` | The maintenance DB commit may exist while the activation sidecar is still stale or missing. This is the exact intermediate state frozen in R2b. |
 | **G10** `log_phase` / `log_fact` | The submit may be committed while some relations or cues are not. This is the exact intermediate state frozen in R2b. |
 | **G12** tracked `retrieve` | One or more `record_access` commits may exist while the remaining accesses and `apply_recall` do not. This is the exact intermediate state frozen in R2b. |
@@ -101,7 +101,7 @@ The law has four parts:
 2. **The final store passes** all seven `doctor` checks.
 3. **Serializability at transaction boundaries.**
    - The serial unit is a **committed transaction**, not a public operation. Compound operations are split into their committed sub-transactions, in the order the frozen R2b behavior defines:
-     - G2 intake `submit`: evidence capture, received intake, materialization, evidence linking, decision;
+     - G2 intake `submit`: evidence capture, received intake, then either materialization, evidence linking (only with a non-null `target_revision_id`) and decision, or decision alone for `held` / `rejected` / `no_op`;
      - G10 `log_phase` and `log_fact`: the submit (itself the G2 sequence), then each relation or cue commit;
      - G12 tracked `retrieve`: each `record_access` commit, then `apply_recall`;
    - Another process's transaction may fall between two sub-transactions of one operation.
