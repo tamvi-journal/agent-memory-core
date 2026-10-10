@@ -479,7 +479,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ b67914f (settled with Lam @ adefd95, #32):** the Windows backup-mtime domain is `[0, 2^31 s)` (P19, §3.7 W1); `.last-profile` is always LF and readers accept CRLF (P20, §3.7 W2).
+- **Codex @ b67914f (settled with Lam @ b952a30, #32):** the Windows backup-mtime domain is `[0, 2^31 s)` (P19, §3.7 W1); `.last-profile` is always LF and readers accept CRLF (P20, §3.7 W2).
 - **Codex @ 2624e10 (settled with Lam @ 94ee892):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
 - **Codex @ 0d3e00d (settled with Lam @ 1444390):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
 - **Codex @ be9f9fc (settled with Lam @ 91995f2):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
