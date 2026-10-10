@@ -249,6 +249,32 @@ Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. T
 
 **Tests.** The Codex schedules become deterministic regressions in both directions (Python victim / TS holder, and TS victim / Python holder) for `close-loop` and `revise`. Each result must equal one serial order (§2.3), with no `IntegrityError` and no untyped error.
 
+### 3.5c P18: same-key intake race resolves through replay (oracle patch, both runtimes)
+
+**Finding (Codex @ be9f9fc).** The schedule, in both directions:
+1. A passes the prior-key lookup (`governance.py:63`, `governance.ts:193`) and commits G2 unit 1, evidence capture.
+2. B submits the identical key and completes.
+3. A's received-intake INSERT (`governance.py:351`, `governance.ts:218`) then fails on `UNIQUE(memory_intake_v3.idempotency_key)`, and the result surfaces as `RuntimeError: internal error`.
+
+The final store is a valid unit-level serialization (§2.3: the serial unit is the committed sub-transaction), namely A.capture, then all of B. The public result is not: §2.3 forbids an untyped error.
+
+**Law.**
+- The received-intake INSERT is the authoritative idempotency point. The pre-check at the start of `submit` stays as it is; it is the fast path, and G1 is frozen.
+- If that INSERT raises a constraint error, the transaction is rolled back. Then, outside that transaction, the row is re-read with the same key lookup the pre-check uses.
+  - A row exists: apply **exactly** the pre-check rule. If `proposal_sha256` is equal, return that row as the replay returns it (it is read now, so it may still be `received`). If it differs, raise `ValueError("idempotency_key already exists with a different proposal")`.
+  - No row exists: re-raise. It stays an internal error, and X reports it as a mismatch.
+- Matching is by "constraint error, then the row exists by key". It never inspects the message text, so it works the same way for a `UNIQUE` conflict on `intake_id` (derived from the key) and on `idempotency_key`.
+- **State.** The loser's committed evidence-capture rows stay. That is the frozen G2 unit-1 intermediate, already legal after a kill (§2.2), and it is not cleaned up. The loser commits nothing after it.
+- **Not changed:** the G2 units and their order, the G1 replay behavior, sequential results, and every corpus payload.
+
+**Other sites.** Codex lists every check-then-insert idempotency site in both runtimes: file, function, the lookup, and the insert, for example operation `idempotency_key` and receipts. Where the existing replay rule is the same simple pre-check, apply the same law there. If a site's replay rule is anything else, STOP and report it. Do not invent a rule.
+
+**Tests.** Deterministic gate regressions in both directions (Python loser / TS winner, and the reverse) for:
+- an identical proposal: the loser returns the same bytes a serial replay at that point returns;
+- a different proposal with the same key: the loser raises the typed `ValueError`.
+
+For each, the final dump must be equal across directions, doctor must pass, and no `-wal`/`-shm`/`-journal` may remain. Add one X concurrency plan family with shared intake keys, so that the distinct-key passes stop standing in for this schedule.
+
 ### 3.6 Backup mtime resolution (Codex @ bef36ce; amends R2d §3.7 and §5.2)
 
 **Finding.** X found that a TS `migrate-to` backup does not reproduce the source mtime to the nanosecond. Example: a source with `mtime_ns = 1700000000123456789` gave a TS backup of `…122999000`. TS passed millisecond `Date`s to `utimesSync`. Python's `copy2` keeps every nanosecond.
@@ -374,7 +400,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 ## 5. CI and deliverables
 
 - **CI on all three OSes:** X §2.1, §2.2 and §2.3, plus Z at its fixed budgets.
-- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, or P17) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
+- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, P17 or P18) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
 - **Local only:** M produces `rehearsal-report.json` (counts and hashes, §4.1). Ty decides whether to share it.
 - **PR shape:** one implementation PR covers X, Z, P15 (and P16 if triggered), the M runner, and `docs/runbooks/r3-rehearsal.md`. CI never runs the rehearsal itself.
 
@@ -398,6 +424,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ be9f9fc (pending Lam's ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
