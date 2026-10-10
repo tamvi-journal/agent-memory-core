@@ -260,18 +260,32 @@ The final store is a valid unit-level serialization (§2.3: the serial unit is t
 
 **Law.**
 - The received-intake INSERT is the authoritative idempotency point. The pre-check at the start of `submit` stays as it is; it is the fast path, and G1 is frozen.
-- If that INSERT raises a constraint error, the transaction is rolled back. Then, outside that transaction, the row is re-read with the same key lookup the pre-check uses.
+- **Catch scope (Lam B1).** The handler wraps **only** the G2 unit-2 received-intake INSERT transaction. It never wraps `submit()` as a whole, evidence capture, materialization, evidence linking or the decision. `memory_intake_v3` also has NOT NULL, CHECK and FK constraints, and an error from any other unit must surface unchanged.
+- Recovery requires **all** of the following, and it never inspects the message text:
+  1. that INSERT raised a SQLite constraint error;
+  2. its transaction has rolled back;
+  3. a fresh lookup by the same `idempotency_key`, outside that transaction, returns a row;
+  4. that row's `intake_id` equals the deterministic `intake_id` derived from the key.
+
+  If any of these is false, re-raise the **original** constraint error.
   - A row exists: apply **exactly** the pre-check rule. If `proposal_sha256` is equal, return that row as the replay returns it (it is read now, so it may still be `received`). If it differs, raise `ValueError("idempotency_key already exists with a different proposal")`.
-  - No row exists: re-raise. It stays an internal error, and X reports it as a mismatch.
-- Matching is by "constraint error, then the row exists by key". It never inspects the message text, so it works the same way for a `UNIQUE` conflict on `intake_id` (derived from the key) and on `idempotency_key`.
+  - Otherwise (no row, or a different `intake_id`): re-raise. It stays an internal error, and X reports it as a mismatch.
 - **State.** The loser's committed evidence-capture rows stay. That is the frozen G2 unit-1 intermediate, already legal after a kill (§2.2), and it is not cleaned up. The loser commits nothing after it.
 - **Not changed:** the G2 units and their order, the G1 replay behavior, sequential results, and every corpus payload.
 
-**Other sites.** Codex lists every check-then-insert idempotency site in both runtimes: file, function, the lookup, and the insert, for example operation `idempotency_key` and receipts. Where the existing replay rule is the same simple pre-check, apply the same law there. If a site's replay rule is anything else, STOP and report it. Do not invent a rule.
+**Other sites.** Codex lists every check-then-insert idempotency site in both runtimes: file, function, the lookup, and the insert, for example operation `idempotency_key` and receipts. A site may share P18 **only** if its existing replay law is exactly the following (Lam):
+- a lookup by the same durable key before the insert;
+- a matching stored digest or payload returns the prior stored result or row exactly;
+- a mismatch returns the already-existing deterministic typed refusal;
+- there is no extra authority or state-transition semantics.
+
+If any site differs in any of these, STOP and bring it back for review. Do not generalize from "it also has a UNIQUE constraint".
 
 **Tests.** Deterministic gate regressions in both directions (Python loser / TS winner, and the reverse) for:
 - an identical proposal: the loser returns the same bytes a serial replay at that point returns;
 - a different proposal with the same key: the loser raises the typed `ValueError`.
+
+- **the `received` replay case (Lam B2).** The winner commits G2 unit 2, so the intake row is `received`, and pauses **before** materialization and the decision. The loser submits the same key with the same proposal, hits the conflict, rolls back, re-reads, and returns the exact `received` row bytes. Only after that does the winner continue. This proves P18 reuses the frozen pre-check replay and never waits or polls for a terminal status.
 
 For each, the final dump must be equal across directions, doctor must pass, and no `-wal`/`-shm`/`-journal` may remain. Add one X concurrency plan family with shared intake keys, so that the distinct-key passes stop standing in for this schedule.
 
@@ -424,7 +438,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ be9f9fc (pending Lam's ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
+- **Codex @ be9f9fc (Lam: ACK in substance; B1 and B2 folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
