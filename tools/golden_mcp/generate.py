@@ -33,6 +33,10 @@ ORACLE_SEMANTICS = [
     "P7-recursive-input-validation",
     "P8-retrieve-tracking-contract",
     "P9-explicit-bootstrap-policy",
+    "P16-store-busy",
+    "P15-evidence-metadata",
+    "P17-sequence-allocation",
+    "R3-backup-microsecond-domain",
 ]
 TABLES = ROOT / "memory_core" / "tables"
 LEGACY_V4 = ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3"
@@ -43,6 +47,9 @@ SOURCES = (
     "trajecta_identity/*.py",
     "trajecta_identity/profiles/example/profile.json",
     "tools/golden_mcp/generate.py",
+    "tools/r3/busy.py",
+    "tools/r3/holder.py",
+    "tools/golden/generate.py",
 )
 
 
@@ -485,6 +492,7 @@ Transcript = Callable[[dict[str, str]], bytes]
 
 
 SCENARIOS: dict[str, tuple[Setup | None, Transcript]] = {
+    "p16-store-busy": (lambda path: (memory(path).bootstrap() and {}) or {}, mutation_error_transcript),
     "initialize": (None, initialize_transcript),
     "basic-methods": (None, basic_transcript),
     "ids": (None, ids_transcript),
@@ -607,6 +615,25 @@ def assert_startup_paths(work: Path, environment: dict[str, str], profile: str, 
 
 
 def run_oracle(work: Path, transcript: bytes, profile: str, extra_env: dict[str, str] | None = None) -> tuple[bytes, bytes]:
+    from tools.r3.busy import held_writer
+    if work.name == "p16-store-busy":
+        # Run exactly the same production subprocess while the test-only holder pauses.
+        clock = work / "holder-clock"
+        clock.mkdir()
+        env = isolated_environment(work, clock, extra_env)
+        with held_writer("py", work / "store.sqlite3", env):
+            before = (work / "store.sqlite3").read_bytes()
+            import time
+            start = time.monotonic()
+            result = _run_oracle(work, transcript, profile, extra_env)
+            assert time.monotonic() - start >= 4.5
+            assert b"StoreBusy: store is busy; retry later" in result[0] and not result[1]
+            assert (work / "store.sqlite3").read_bytes() == before
+        return result
+    return _run_oracle(work, transcript, profile, extra_env)
+
+
+def _run_oracle(work: Path, transcript: bytes, profile: str, extra_env: dict[str, str] | None = None) -> tuple[bytes, bytes]:
     clock = work / "clock"
     clock.mkdir()
     write_sitecustomize(clock / "sitecustomize.py")

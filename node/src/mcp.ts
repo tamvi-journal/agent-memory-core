@@ -38,6 +38,7 @@ const PUBLIC_ERRORS = new Set([
   "ReceiptNotFound",
   "RuntimeError",
   "SchemaVersionError",
+  "StoreBusy",
   "StaleAuthority",
   "ValueError",
   "WorkStoreError",

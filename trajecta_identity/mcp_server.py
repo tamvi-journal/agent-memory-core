@@ -443,6 +443,7 @@ class IdentityServer:
             "ReceiptNotFound",
             "RuntimeError",
             "SchemaVersionError",
+            "StoreBusy",
             "StaleAuthority",
             "ValueError",
             "WorkStoreError",

@@ -34,6 +34,7 @@ from .store import (
     MigrationRequiredError,
     PinnedRecordError,
     SchemaVersionError,
+    StoreBusy,
     canonical_evidence_identity,
 )
 
@@ -53,6 +54,7 @@ __all__ = [
     "PacketRenderer",
     "PACKET_BUDGET_ESTIMATOR",
     "SchemaVersionError",
+    "StoreBusy",
     "APPLICATION_ID",
     "SCHEMA_VERSION",
     "LEGACY_V3_VERSION",

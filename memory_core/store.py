@@ -41,6 +41,22 @@ class PinnedRecordError(ValueError):
     """A public identity writer attempted to mutate a structural record."""
 
 
+class StoreBusy(RuntimeError):
+    def __init__(self):
+        super().__init__("store is busy; retry later")
+
+
+def _translate_sqlite_error(error: sqlite3.Error) -> Exception:
+    code = getattr(error, "sqlite_errorcode", None)
+    if hasattr(error, "sqlite_errorcode"):
+        busy = isinstance(code, int) and (code & 0xff) in {5, 6}
+    else:
+        busy = isinstance(error, sqlite3.OperationalError) and str(error) in {
+            "database is locked", "database table is locked", "database schema is locked",
+        }
+    return StoreBusy() if busy else error
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -204,15 +220,28 @@ class MemoryStore:
 
     @contextmanager
     def _raw_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
+        # Includes open, statements in the caller, and context-manager COMMIT.
+        # The inner connection rolls back before this public translation.
+        try:
+            with self._sqlite_connect(readonly=readonly) as conn:
+                yield conn
+        except sqlite3.Error as exc:
+            translated = _translate_sqlite_error(exc)
+            if translated is exc:
+                raise
+            raise translated from exc
+
+    @contextmanager
+    def _sqlite_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
         repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
         resolved = self.db_path.resolve()
         self._preflight(readonly=readonly)
         if readonly:
             uri = f"{resolved.as_uri()}?mode=ro"
-            conn = sqlite3.connect(uri, uri=True)
+            conn = sqlite3.connect(uri, uri=True, timeout=5.0)
         else:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA foreign_keys=ON")
@@ -232,6 +261,9 @@ class MemoryStore:
                 try:
                     mode = str(conn.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower()
                 except sqlite3.Error as exc:
+                    translated = _translate_sqlite_error(exc)
+                    if translated is not exc:
+                        raise translated from exc
                     raise IncompatibleJournalMode(
                         f"SQLite refused journal_mode=DELETE. {repair}"
                     ) from exc
@@ -346,6 +378,7 @@ class MemoryStore:
                 )
             }
             conn.executescript(schema)
+            conn.execute("BEGIN IMMEDIATE")
             if "memory_records_v2" in tables:
                 self._migrate_v2(conn)
             self._backfill_relation_events(conn)
@@ -442,8 +475,21 @@ class MemoryStore:
             raise ValueError("backup path must differ from target")
         if backup.exists():
             raise FileExistsError(backup)
+        source_mtime_ns = self.db_path.stat().st_mtime_ns
+        if not 0 <= source_mtime_ns < (1 << 32) * 10**9:
+            raise ValueError("source mtime is outside the supported backup range")
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.db_path, backup)
+        copied = False
+        try:
+            shutil.copy2(self.db_path, backup)
+            copied = True
+            if backup.stat().st_mtime_ns // 1000 != source_mtime_ns // 1000:
+                raise ValueError("backup mtime could not be preserved to a microsecond")
+        except (OSError, ValueError) as exc:
+            if not copied and not backup.exists():
+                raise
+            backup.unlink(missing_ok=True)
+            raise ValueError("backup mtime could not be preserved to a microsecond") from exc
         # Outside cleanup: target may alias the durable backup through its parent.
         if target.exists():
             raise FileExistsError(target)
@@ -580,6 +626,7 @@ class MemoryStore:
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -687,6 +734,7 @@ class MemoryStore:
             )
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -795,6 +843,7 @@ class MemoryStore:
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -1137,6 +1186,7 @@ class MemoryStore:
             raise ValueError("relation weight must be between 0 and 10")
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             if idempotency_key:
                 prior = conn.execute(
                     "SELECT * FROM memory_relation_events_v4 "
@@ -1292,6 +1342,7 @@ class MemoryStore:
             raise ValueError("access gain must be between 0 and 1")
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             owner = conn.execute(
                 "SELECT record_id FROM memory_revisions_v3 WHERE revision_id=?",
                 (revision_id,),
@@ -1341,6 +1392,7 @@ class MemoryStore:
         operation_key = idempotency_key or f"maintenance:{run_id}"
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, operation_key)
             if prior:
                 return self._operation_result(conn, prior)

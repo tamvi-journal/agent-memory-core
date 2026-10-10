@@ -5,7 +5,6 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
-  utimesSync,
   openSync,
   readFileSync,
   readSync,
@@ -13,7 +12,9 @@ import {
   unlinkSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { openDatabase } from "./sqlite-errors.ts";
+import { copyBackup, sourceBackupTime } from "./backup-time.ts";
 import { fileURLToPath } from "node:url";
 import {
   FileExistsError,
@@ -518,7 +519,7 @@ export class MemoryStore {
       throw new MigrationRequired("schema v3 store must be initialized or migrated to v5 before use");
     }
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { readOnly: true, enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { readOnly: true, enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       verifyConnection(database, false);
       this.#database = database;
@@ -554,7 +555,7 @@ export class MemoryStore {
       if (current.state === "ready") return { ...current, changed: false, migrated_from: null };
     }
     mkdirSync(dirname(this.path), { recursive: true });
-    const database = new DatabaseSync(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       database.exec(readFileSync(SCHEMA_PATH, "utf8"));
       database.exec(
@@ -575,7 +576,7 @@ export class MemoryStore {
     this.close();
     readHeader(this.path);
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       verifyConnection(database, true);
       database.exec("BEGIN IMMEDIATE");
@@ -613,10 +614,9 @@ export class MemoryStore {
     if (!options.dryRun) {
       if (normcase(backup) === normcase(target)) throw new ValueError("backup path must differ from target");
       if (existsSync(backup)) throw new FileExistsError(backup);
+      const sourceTime = sourceBackupTime(this.path);
       mkdirSync(dirname(resolve(target)), { recursive: true });
-      const sourceStat = statSync(this.path);
-      copyFileSync(this.path, backup);
-      utimesSync(backup, sourceStat.atime, sourceStat.mtime);
+      copyBackup(this.path, backup, sourceTime);
       // Outside cleanup: an aliased target must never cause backup deletion.
       if (existsSync(target)) throw new FileExistsError(target);
     }
@@ -626,9 +626,10 @@ export class MemoryStore {
     try {
       copyFileSync(this.path, work);
       readHeader(work);
-      const database = new DatabaseSync(work, { enableForeignKeyConstraints: true, timeout: 5000 });
+      const database = openDatabase(work, { enableForeignKeyConstraints: true, timeout: 5000 });
       try {
         database.exec(readFileSync(SCHEMA_PATH, "utf8"));
+        database.exec("BEGIN IMMEDIATE");
         if (before.state === "legacy-v2") migrateV2(database, this.clock);
         backfillRelations(database);
         database
@@ -637,6 +638,7 @@ export class MemoryStore {
           )
           .run();
         database.exec(`PRAGMA application_id=${APPLICATION_ID}; PRAGMA user_version=${SCHEMA_VERSION};`);
+        database.exec("COMMIT");
         const mode = String((database.prepare("PRAGMA journal_mode=DELETE").get() as Row).journal_mode).toLowerCase();
         if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
       } finally {
@@ -706,7 +708,7 @@ export class MemoryStore {
     if (!this.exists()) return { application_id: 0, user_version: 0, state: "uninitialized" };
     readHeader(this.path);
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { readOnly: true, timeout: 5000 });
+    const database = openDatabase(this.path, { readOnly: true, timeout: 5000 });
     try {
       const facts = inspect(database);
       const mode = String(

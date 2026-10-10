@@ -15,6 +15,7 @@ def test_writes_manifest_authenticates_every_file_and_frozen_table():
     assert manifest["oracle_semantics"] == [
         "R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck",
         "P15-evidence-metadata",
+        "P16-store-busy", "P17-sequence-allocation", "R3-backup-microsecond-domain",
     ]
     expected = {
         path.relative_to(CORPUS).as_posix()
@@ -36,6 +37,7 @@ def test_writes_corpus_has_every_settled_scenario_group():
         "fact-loop", "intake", "kernel", "recall", "decay", "decay-boundary",
         "decay-half", "legacy-v4", "migration-v2", "migration-v3", "migration-v4",
         "evidence-metadata-p15", "evidence-replay-p15",
+        "evidence-intake-defaults-p15", "relation-missing-endpoint-r3",
     }
 
 

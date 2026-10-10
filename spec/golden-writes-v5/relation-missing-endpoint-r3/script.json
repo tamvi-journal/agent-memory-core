@@ -1,0 +1,1 @@
+{"actions":[{"call":"initialize"},{"call":"add_relation","arguments":{"relation_id":"missing","from_record_id":"a","to_record_id":"b","relation_type":"supports"},"expect_error":"IntegrityError"}]}

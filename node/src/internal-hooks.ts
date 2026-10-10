@@ -5,6 +5,8 @@
  * post-open recheck is authoritative.
  */
 export const hooks: {
+  beforeBackupTimeSet: (() => void) | null;
+  afterBackupTimeSet: ((path: string) => void) | null;
   beforeOpen: ((path: string) => void) | null;
   afterAuthorityRevisionInsert: (() => void) | null;
   afterCreateRevisionInsert: (() => void) | null;
@@ -14,6 +16,8 @@ export const hooks: {
   beforeMaintenanceHashCheck: ((database: any) => void) | null;
   beforeDecaySidecarWrite: (() => void) | null;
 } = {
+  beforeBackupTimeSet: null,
+  afterBackupTimeSet: null,
   beforeOpen: null,
   afterAuthorityRevisionInsert: null,
   afterCreateRevisionInsert: null,

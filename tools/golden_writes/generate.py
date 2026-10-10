@@ -23,7 +23,8 @@ from trajecta_identity import IdentityMemory, load_profile  # noqa: E402
 from trajecta_identity.identity import PINNED  # noqa: E402
 
 ORACLE_BASE_COMMIT = "fa21042533826fcfa18bed97f5328166723fcbfa"
-ORACLE_SEMANTICS = ["R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck", "P15-evidence-metadata"]
+ORACLE_SEMANTICS = ["R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck", "P15-evidence-metadata",
+                    "P16-store-busy", "P17-sequence-allocation", "R3-backup-microsecond-domain"]
 TABLES = ROOT / "memory_core" / "tables"
 LEGACY_V4 = ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3"
 SOURCES = (
@@ -108,6 +109,20 @@ def scripts() -> dict[str, dict[str, Any]]:
             {"call": "create_current", "arguments": {
                 **create_args, "evidence": {field: None for field in metadata_fields},
             }},
+        ]},
+        "evidence-intake-defaults-p15": {"actions": [
+            {"call": "initialize"},
+            *[{"call": "intake_submit", "arguments": {"proposal": proposal(
+                "p15-intake", "p15-intake", evidence=[evidence("p15-intake", **{field: value})])},
+                "expect_error": "ValueError"}
+              for field in ("actor", "surface", "model_family", "privacy_class")
+              for value in (None, True, 1, 1.0, [], {})],
+        ]},
+        "relation-missing-endpoint-r3": {"actions": [
+            {"call": "initialize"},
+            {"call": "add_relation", "arguments": {
+                "relation_id": "missing", "from_record_id": "a", "to_record_id": "b", "relation_type": "supports",
+            }, "expect_error": "IntegrityError"},
         ]},
         "bootstrap": {"actions": [*base, {"call": "bootstrap"}, {"call": "bootstrap_invalid", "expect_error": "ValueError"}]},
         "phase": {"actions": [
