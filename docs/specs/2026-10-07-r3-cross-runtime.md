@@ -119,7 +119,7 @@ The law has four parts:
 |---|---|---|
 | MCP framing and dispatch (in-process serve harness, both runtimes) | Seeded mutations of the R2c corpus transcripts: byte flips, invalid UTF-8, `\r` placement, ids at the edge of the closed id domain, arguments at schema limits, unknown keys, nesting. **Each case carries an explicit `chunks: [bytes…]` partition** that is fed exactly to both harnesses (F3). | Output bytes, store class and dump (§5.2) |
 | MCP real subprocess stdin | A fixed set of transport smokes (split writes, a final frame at EOF). These are kept separate from the chunk-partitioned fuzz. | stdout bytes, exit code |
-| CLI argv, stdin and env | Seeded mutations of the R2d scenarios: integer tokens over the frozen tables, option permutations, profile JSON mutations, confirmation bytes | Exit code, stdout and stderr (last-line prefix for usage errors), and the file tree under §5.2 |
+| CLI argv, stdin and env | Seeded mutations of the R2d scenarios: integer tokens over the frozen tables, option permutations, profile JSON mutations, confirmation bytes | Exit code, stdout and stderr (last-line `<prog>: error:` prefix for usage errors, §3.1b), and the file tree under §5.2 |
 | Kernel library API (TS module versus Python module, the same process model as the R2b writes corpus) | Seeded intake proposals and evidence lists, including the R2b carry: present-null, non-string, nested and oversized evidence metadata | Outcome (`Name: message` or success) and dump |
 
 **Generation caps (F3).** Every generator enforces hard caps, recorded in the corpus metadata:
@@ -129,6 +129,27 @@ The law has four parts:
 - Every boundary has a fixed number of cases per seed.
 
 Within these caps, Z stays a differential protocol test. It does not turn into stack or memory stress outside the contract.
+
+### 3.1b Usage-error prefix (Codex @ 6782110; amends R2d §3.1)
+
+**Finding.** `timeline --limit 1.0` (also `retrieve --limit 1.0` and `timeline --limit 1e2`) exits 2 in both runtimes with an unchanged tree. But the last stderr lines differ:
+- Python: `trajecta-identity timeline: error: …`
+- TS: `trajecta-identity: error: …`
+
+R2d §3.1 froze the literal prefix `trajecta-identity: error:`. Python never met it for errors raised by a subcommand parser. The cli-v1 generator hid this, because it **wrote the constant** for every exit-2 case instead of checking Python's output (`tools/golden_cli/generate.py`, usage mode). That is a generator defect, not an oracle behavior.
+
+**Law (no oracle patch; Python stays as it is).**
+- The frozen part of a usage error is the argparse prefix `<prog>: error:` of the parser that raised it:
+  - `trajecta-identity: error:` for the root parser (no command, unknown command, unrecognized arguments);
+  - `trajecta-identity <command>: error:` for a command's own parser (a missing or invalid option, a mutually exclusive group, and so on). There is one level of commands, so there is no deeper prog.
+- TS must emit the **same** prefix as Python. That means it must raise from the same parser, which is a grammar property. The text after `error:` stays unfrozen.
+- Exit 2, and usage writes nothing, as before.
+
+**Corpus repair (declared old-corpus impact).**
+- The cli-v1 generator extracts Python's actual last non-empty stderr line and asserts that it starts with `<prog>: error:` for a known prog. It stores exactly that prefix, never a constant.
+- The only bytes that may change are the stored `stderr` of exit-2 cases raised by a command parser (for example `usage-04`, `usage-05`, `integer-04`/`05`/`06`/`10`/`11`), plus the MANIFEST provenance. Every other byte stays identical. The commit lists each changed case.
+- The TS replay compares the stored prefix exactly. If TS emits the wrong prefix today, fix TS; never relax the comparator.
+- Z's CLI boundary uses the same law.
 
 ### 3.2 Determinism and budgets (Q3)
 
@@ -353,7 +374,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 ## 5. CI and deliverables
 
 - **CI on all three OSes:** X §2.1, §2.2 and §2.3, plus Z at its fixed budgets.
-- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, or P16 if it is triggered) that comes with its own new cases.
+- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, or P17) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
 - **Local only:** M produces `rehearsal-report.json` (counts and hashes, §4.1). Ty decides whether to share it.
 - **PR shape:** one implementation PR covers X, Z, P15 (and P16 if triggered), the M runner, and `docs/runbooks/r3-rehearsal.md`. CI never runs the rehearsal itself.
 
@@ -377,7 +398,8 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ df5b755 (pending Lam's ack):**
+- **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
+- **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
   - P17, sequence allocation inside `BEGIN IMMEDIATE` (§3.5b).
 - **Codex @ bef36ce, settled with Lam @ 5b6dd56:**
