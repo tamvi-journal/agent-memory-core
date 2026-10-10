@@ -9,6 +9,7 @@ import os
 import shutil
 import sqlite3
 import stat
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -192,7 +193,7 @@ def compare_trees(oracle_root: Path, actual_root: Path, before_oracle: dict, bef
 def assert_decay_margin(path: Path, moment: str) -> None:
     """Reject generated fixtures before either run; old half-way fixtures stay frozen."""
     uri = path.resolve().as_uri() + "?mode=ro&immutable=1"
-    with sqlite3.connect(uri, uri=True) as conn:
+    with closing(sqlite3.connect(uri, uri=True)) as conn:
         rows = conn.execute("SELECT record_id,domain,created_at,stability,accessibility,last_accessed_at FROM memory_current_v3").fetchall()
     now = datetime.fromisoformat(moment)
     from trajecta_identity.identity import PINNED

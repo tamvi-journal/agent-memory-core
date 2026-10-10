@@ -17,6 +17,7 @@ import sys
 import tempfile
 import threading
 import unicodedata
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -110,7 +111,7 @@ def isolated_env(work, clock):
 
 def schema_record(path):
     # immutable avoids journal handling while inspecting the oracle fixture.
-    with sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True) as db:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
         return {"application_id": db.execute("PRAGMA application_id").fetchone()[0],
                 "user_version": db.execute("PRAGMA user_version").fetchone()[0],
                 "sqlite_master": [list(row) for row in db.execute(

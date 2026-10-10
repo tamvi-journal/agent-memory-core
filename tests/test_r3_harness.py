@@ -96,3 +96,28 @@ def test_decay_whitelist_accepts_only_the_named_numeric_tokens():
     op["details_json"] = json.dumps(details, ensure_ascii=False)
     compare_dumps(expected, actual, decay=True)
 
+
+
+def test_oracle_inspectors_close_sqlite_handles_before_case_cleanup(tmp_path, monkeypatch):
+    import sqlite3, shutil
+    from pathlib import Path
+    from tools.r3.common import schema_and_dump, assert_decay_margin
+    fixture = Path(__file__).resolve().parents[1] / "spec/golden-writes-v5/bootstrap/store.sqlite3"
+    path = tmp_path / "store.sqlite3"
+    shutil.copyfile(fixture, path)
+    connect = sqlite3.connect
+    connections = []
+    def observed(*args, **kwargs):
+        conn = connect(*args, **kwargs)
+        connections.append(conn)
+        return conn
+    monkeypatch.setattr(sqlite3, "connect", observed)
+    schema_and_dump(path)
+    assert_decay_margin(path, "2026-10-01T00:00:00+00:00")
+    assert len(connections) == 3
+    try:
+        for conn in connections:
+            with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+                conn.execute("SELECT 1")
+    finally:
+        for conn in connections: conn.close()

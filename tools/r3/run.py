@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import base64
 import concurrent.futures
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -112,7 +113,7 @@ def case_for_step(root, action, index, saved):
         elif operation == "close-legacy-discussion":
             argv += ["--note", args["note"], "--issue-only"]
             uri = (root / case["database"]).as_uri() + "?mode=ro&immutable=1"
-            with sqlite3.connect(uri, uri=True) as conn:
+            with closing(sqlite3.connect(uri, uri=True)) as conn:
                 event = conn.execute("SELECT relation_event_id FROM memory_relation_events_v4 WHERE relation_type='awaiting-discussion' ORDER BY sequence_number DESC LIMIT 1").fetchone()[0]
             case.update(tty=True, stdin=base64.b64encode(("CLOSE " + event.split(":", 1)[1][:12] + "\n").encode()).decode())
         elif operation == "migrate-to":
