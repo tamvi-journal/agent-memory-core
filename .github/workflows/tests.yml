@@ -14,7 +14,9 @@ jobs:
   r3-cross-runtime:
     name: ${{ matrix.os }} / R3 X and synthetic M
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # Windows reached 15m after the fixed matrix and crashes, during mandatory concurrency.
+    # Extend only the runner failure bound; every plan, seed and serial proof remains required.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
