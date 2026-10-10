@@ -1,11 +1,12 @@
-/** Settled R3 §3.6. Backup timestamps alone compare whole microseconds. */
+/** Settled R3 §3.6/§3.7. Backup timestamps alone compare whole microseconds. */
 import { copyFileSync, existsSync, statSync, unlinkSync, utimesSync } from "node:fs";
 import { hooks } from "./internal-hooks.ts";
 import { ValueError } from "./errors.ts";
 
 export function sourceBackupTime(path: string): bigint {
   const ns = statSync(path, { bigint: true }).mtimeNs;
-  if (ns < 0n || ns >= (1n << 32n) * 1_000_000_000n) {
+  const upper = (1n << (process.platform === "win32" ? 31n : 32n)) * 1_000_000_000n;
+  if (ns < 0n || ns >= upper) {
     throw new ValueError("source mtime is outside the supported backup range");
   }
   return ns;

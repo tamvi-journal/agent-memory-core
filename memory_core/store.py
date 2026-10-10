@@ -6,6 +6,7 @@ import re
 import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -471,7 +472,8 @@ class MemoryStore:
         if backup.exists():
             raise FileExistsError(backup)
         source_mtime_ns = self.db_path.stat().st_mtime_ns
-        if not 0 <= source_mtime_ns < (1 << 32) * 10**9:
+        backup_upper_ns = (1 << (31 if sys.platform == "win32" else 32)) * 10**9
+        if not 0 <= source_mtime_ns < backup_upper_ns:
             raise ValueError("source mtime is outside the supported backup range")
         target.parent.mkdir(parents=True, exist_ok=True)
         copied = False

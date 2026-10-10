@@ -35,8 +35,11 @@ jobs:
         run: python -c "from pathlib import Path; Path('.isolation/tmp').mkdir(parents=True, exist_ok=True); Path('.isolation/r3-reports').mkdir(parents=True, exist_ok=True)"
       - name: Install test helpers
         run: python -m pip install -e ".[test]"
+      - name: Windows P19 and P20 end-to-end merge gate
+        if: runner.os == 'Windows'
+        run: python -W error::ResourceWarning -m pytest -vv -s tests/test_r3_backup_time.py tests/test_r3_windows_law.py
       - name: Focused laws and synthetic rehearsal only
-        run: python -W error::ResourceWarning -m pytest -q tests/test_r3_fixture_headers.py tests/test_r3_idempotency.py tests/test_r3_allocation.py tests/test_r3_backup_time.py tests/test_r3_busy.py tests/test_r3_evidence.py tests/test_r3_g2.py tests/test_r3_harness.py tests/test_r3_fuzz.py tests/test_r3_usage.py tests/test_r3_rehearsal.py
+        run: python -W error::ResourceWarning -m pytest -q tests/test_r3_fixture_headers.py tests/test_r3_idempotency.py tests/test_r3_allocation.py tests/test_r3_backup_time.py tests/test_r3_windows_law.py tests/test_r3_busy.py tests/test_r3_evidence.py tests/test_r3_g2.py tests/test_r3_harness.py tests/test_r3_fuzz.py tests/test_r3_usage.py tests/test_r3_rehearsal.py
       - name: X fixed matrix and all 200 seeds
         run: python tools/r3/run.py > .isolation/r3-reports/sequential.jsonl
       # Synthetic filesystem values retained only when a Windows law fails.
@@ -56,7 +59,9 @@ jobs:
   r3-differential:
     name: ${{ matrix.os }} / R3 Z 2000 MCP 2000 CLI 5000 kernel
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    # Windows exhausted the former wall-clock bound before finishing its fixed budgets.
+    # Every case remains mandatory; this is only the job's failure timeout (§3.2).
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

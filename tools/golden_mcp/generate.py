@@ -39,6 +39,8 @@ ORACLE_SEMANTICS = [
     "P17-initialization-guard",
     "P18-intake-only-replay",
     "R3-backup-microsecond-domain",
+    "P19-os-backup-domain",
+    "P20-last-profile-lf",
 ]
 TABLES = ROOT / "memory_core" / "tables"
 LEGACY_V4 = ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3"

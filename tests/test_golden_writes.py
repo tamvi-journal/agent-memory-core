@@ -17,6 +17,7 @@ def test_writes_manifest_authenticates_every_file_and_frozen_table():
         "P15-evidence-metadata",
         "P16-store-busy", "P17-sequence-allocation", "P17-initialization-guard",
         "P18-intake-only-replay", "R3-backup-microsecond-domain",
+        "P19-os-backup-domain", "P20-last-profile-lf",
     ]
     expected = {
         path.relative_to(CORPUS).as_posix()

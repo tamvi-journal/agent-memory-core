@@ -20,7 +20,7 @@ const midpoint=Number(sec)+Number(micros*1000n+500n)/1e9;
 utimesSync(target,statSync(source).atime,midpoint);
 console.log(JSON.stringify({before,copied,midpoint,set:String(statSync(target,{bigint:true}).mtimeNs)}));
 """
-for index, requested in enumerate([0,-1,1700000000123456789,(1<<32)*10**9-1,(1<<32)*10**9]):
+for index, requested in enumerate([0,-1,1700000000123456789,(1<<31)*10**9-1,(1<<31)*10**9,(1<<32)*10**9-1,(1<<32)*10**9]):
     source, target = root / f"source-{index}", root / f"backup-{index}"
     source.write_bytes(b"synthetic timestamp only")
     os.utime(source,ns=(0,requested))
