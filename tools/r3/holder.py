@@ -14,7 +14,8 @@ def main():
 
     def paused(connection, revision):
         original(connection, revision)
-        print("ready", flush=True)
+        sys.stdout.buffer.write(b"ready\n")
+        sys.stdout.buffer.flush()
         if sys.stdin.buffer.read(1) != b"R":
             raise RuntimeError("holder released without the parent handshake")
 

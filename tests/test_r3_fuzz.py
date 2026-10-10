@@ -44,3 +44,34 @@ def test_shrinker_replays_predicate_and_is_deterministic():
     import base64
     fails = lambda c: b"X" in b"".join(base64.b64decode(x) for x in c["chunks"])
     assert shrink(case, fails) == {"surface": "mcp", "chunks": ["WA=="]}
+
+
+def test_batch_worker_releases_case_cwd_before_reply(tmp_path):
+    import base64, json
+    from tools.r3.common import isolated_env
+    from tools.r3.fuzz import Worker
+    from tools.r3.run import validate_case
+    startup = tmp_path / "worker"
+    case_root = tmp_path / "ephemeral-case"
+    worker = Worker("ts", startup)
+    case = {"root": str(case_root), "env": isolated_env(case_root), "surface": "mcp",
+            "chunks": [base64.b64encode(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n').decode()]}
+    validate_case(case_root, case)
+    try:
+        worker.child.stdin.write(json.dumps(case).encode() + b"\n"); worker.child.stdin.flush()
+        result = json.loads(worker.responses.get(timeout=20))
+        assert result["exit"] == 0
+        assert base64.b64decode(result["stdout"]) == b'{"jsonrpc": "2.0", "id": 1, "result": {}}\n'
+        assert __import__("pathlib").Path(result["worker_cwd"]).resolve() == startup.resolve()
+        worker.close()
+    finally:
+        worker.abort()
+
+
+def test_gate_markers_are_literal_lf_even_with_windows_text_streams():
+    import io
+    from tools.r3.instrument import marker
+    raw = io.BytesIO()
+    windows_text = io.TextIOWrapper(raw, newline="\r\n")
+    marker("ready", windows_text)
+    assert raw.getvalue() == b"ready\n"

@@ -14,9 +14,14 @@ WRITERS = ("create_current", "revise", "invalidate", "add_relation", "retract_re
            "add_cue", "record_access", "apply_maintenance")
 
 
+def marker(message, stream=None):
+    stream = sys.__stderr__ if stream is None else stream
+    stream.buffer.write(message.encode("ascii") + b"\n")
+    stream.buffer.flush()
+
+
 def pause():
-    sys.__stderr__.write("R3-CRASH-READY\n")
-    sys.__stderr__.flush()
+    marker("R3-CRASH-READY")
     threading.Event().wait()
 
 
@@ -31,8 +36,7 @@ def instrument(case, units):
             units.append(unit)
         committed += 1
         if case.get("intake_pause_after") == unit["call"]:
-            sys.__stderr__.write("R3-P18-" + unit["call"] + "\n")
-            sys.__stderr__.flush()
+            marker("R3-P18-" + unit["call"])
             while not Path(case["p18_release"]).exists():
                 threading.Event().wait(0.01)
         if case.get("crash_after_unit") == committed:
@@ -46,12 +50,10 @@ def instrument(case, units):
         nonlocal scheduled
         if case.get("allocation_role") == "holder" and not scheduled and current is not None and current["call"] in {"revise", "retract_relation"}:
             scheduled = True
-            sys.__stderr__.write("R3-ALLOCATION-HOLDER\n")
-            sys.__stderr__.flush()
+            marker("R3-ALLOCATION-HOLDER")
             release()
         if case.get("pause_before_relation_write") and current is not None and current["call"] == "retract_relation":
-            sys.__stderr__.write("R3-RELATION-READY\n")
-            sys.__stderr__.flush()
+            marker("R3-RELATION-READY")
             assert sys.__stdin__.buffer.read(1) == b"R"
         value = original_now()
         if current is not None:
@@ -73,14 +75,12 @@ def instrument(case, units):
                     attempt = victim and not gate_scheduled and sql == "BEGIN IMMEDIATE"
                     if attempt:
                         gate_scheduled = True
-                        sys.__stderr__.write("R3-P18-ATTEMPT\n")
-                        sys.__stderr__.flush()
+                        marker("R3-P18-ATTEMPT")
                     result = self.connection.execute(sql, *args)
                     if sql == "BEGIN IMMEDIATE":
                         self.immediate = True
                     if attempt:
-                        sys.__stderr__.write("R3-P18-ACQUIRED\n")
-                        sys.__stderr__.flush()
+                        marker("R3-P18-ACQUIRED")
                     table = case["same_key_gate_table"]
                     if sql.startswith("SELECT") and ("FROM " + table) in sql:
                         assert self.immediate and self.connection.in_transaction, sql
@@ -88,8 +88,7 @@ def instrument(case, units):
                     if not victim and not gate_scheduled and sql.startswith("INSERT INTO " + table):
                         assert self.immediate and self.connection.in_transaction, sql
                         gate_scheduled = True
-                        sys.__stderr__.write("R3-P18-INSERTED\n")
-                        sys.__stderr__.flush()
+                        marker("R3-P18-INSERTED")
                         while not Path(case["p18_release"]).exists():
                             threading.Event().wait(0.01)
                     return result
@@ -109,8 +108,7 @@ def instrument(case, units):
                             units.append({"call": "sql_trace", "sql": sql})
                             if case["allocation_role"] == "victim" and not scheduled and sql.startswith("BEGIN"):
                                 scheduled = True
-                                sys.__stderr__.write("R3-ALLOCATION-VICTIM\n")
-                                sys.__stderr__.flush()
+                                marker("R3-ALLOCATION-VICTIM")
                                 release()
                         conn.set_trace_callback(trace)
                     yield conn

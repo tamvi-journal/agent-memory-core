@@ -50,6 +50,7 @@ async function execute(caseValue: any) {
   const root = realpath(caseValue.root);
   const database = caseValue.database ?? "store.sqlite3";
   contain(root, resolve(root, database));
+  const previousCwd = process.cwd();
   process.chdir(root);
   let stdout = "",
     stderr = "",
@@ -291,9 +292,14 @@ async function execute(caseValue: any) {
   } catch (error) {
     status = 1;
     stderr += `${(error as Error).stack ?? error}\n`;
+  } finally {
+    // Windows holds a process's current directory open. Release this case
+    // before replying so the parent can remove it while batch mode stays alive.
+    process.chdir(previousCwd);
   }
   return {
     exit: status,
+    worker_cwd: process.cwd(),
     units,
     stdout: Buffer.from(stdout).toString("base64"),
     stderr: Buffer.from(stderr).toString("base64"),
