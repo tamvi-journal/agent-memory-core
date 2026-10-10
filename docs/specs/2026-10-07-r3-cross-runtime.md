@@ -260,7 +260,7 @@ Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. T
   - its old value equals the SHA-256 of the old file;
   - its new value equals the SHA-256 of the new file;
   - that file passed the masked comparison;
-  - every other JSON path, value, key order and byte of that file is unchanged.
+  - with **all** such validated hash fields in that JSON file masked together as one set, every other JSON path, value, key order and byte of the file is unchanged.
 
   Any other change → STOP. The commit lists each changed field.
 - This permission does not extend to any other P17 or P18 site. Any other change to SQLite bytes still requires a STOP.
