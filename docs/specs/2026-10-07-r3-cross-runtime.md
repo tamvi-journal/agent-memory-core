@@ -256,6 +256,13 @@ Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. T
 - The generator or a test enforces this mechanically. Each old and new file is compared with exactly those 8 bytes masked, and the result must be equal. Any other differing byte → STOP.
 - The commit lists every changed `.sqlite3` file, in every corpus.
 - At runtime, `initialize` on an already-ready store **in DELETE journal mode** is a read-only transaction. It must leave the store's bytes, mtime and sidecars unchanged (the R2d §5.2 "unchanged" class), in both runtimes, and a regression asserts this. The frozen WAL repair still applies: a ready store whose header is in WAL mode is converted to DELETE on a writable open (`store.py` `_raw_connect`, pinned by `test_owned_wal_converts_to_delete_on_writable_open`), and that conversion happens before the guard transaction.
+- **Derived hash references (Codex @ 2624e10).** A JSON field in a corpus file that stores the SHA-256 of one of those `.sqlite3` files may change too. Examples are cli-v1 `expected.json` `databases.<file>.oracle_sha256`, `tree.<file>.unchanged_sha256` and `tree.<backup>.sha256`. It may change only under all of the following, checked mechanically:
+  - its old value equals the SHA-256 of the old file;
+  - its new value equals the SHA-256 of the new file;
+  - that file passed the masked comparison;
+  - every other JSON path, value, key order and byte of that file is unchanged.
+
+  Any other change → STOP. The commit lists each changed field.
 - This permission does not extend to any other P17 or P18 site. Any other change to SQLite bytes still requires a STOP.
 
 ### 3.5c P18: same-key intake race resolves through replay (oracle patch, both runtimes)
@@ -459,6 +466,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ 2624e10 (pending Lam's ack):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
 - **Codex @ 0d3e00d (pending Lam's ack):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
 - **Codex @ be9f9fc (Lam: ACK in substance; B1, B2 and the site-scope ruling folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
