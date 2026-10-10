@@ -466,9 +466,9 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ 2624e10 (pending Lam's ack):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
-- **Codex @ 0d3e00d (pending Lam's ack):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
-- **Codex @ be9f9fc (Lam: ACK in substance; B1, B2 and the site-scope ruling folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
+- **Codex @ 2624e10 (settled with Lam @ 94ee892):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
+- **Codex @ 0d3e00d (settled with Lam @ 1444390):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
+- **Codex @ be9f9fc (settled with Lam @ 91995f2):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);

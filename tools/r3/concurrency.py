@@ -161,7 +161,19 @@ def run(parent):
     results = [one(parent, fixture_root / "store.sqlite3", seed, kind, count)
                for seed in seeds for kind, count in (("revise", 3), ("revise", 4), ("g10", 1), ("g12", 1),
                                                      ("g2-held", 1), ("g2-no-op", 1))]
-    return {"runs": len(results), "seeds": seeds, "results": results}
+    from tools.r3.idempotency import intake
+    shared = []
+    for seed in seeds:
+        for variant in ("same", "different", "received"):
+            dumps = []
+            for loser, winner in (("py", "ts"), ("ts", "py")):
+                dump, proof = intake(parent / f"shared-{seed}-{variant}-{loser}", loser, winner, variant, seed)
+                dumps.append(dump)
+                shared.append({**proof, "kind": "g2-shared-key", "operations_per_process": 1,
+                               "replayed_candidates": 1, "witnesses": 1})
+            assert dumps[0] == dumps[1]
+    return {"runs": len(results) + len(shared), "seeds": seeds, "results": results,
+            "shared_key_runs": len(shared), "shared_key_results": shared}
 
 
 if __name__ == "__main__":

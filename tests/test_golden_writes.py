@@ -15,7 +15,8 @@ def test_writes_manifest_authenticates_every_file_and_frozen_table():
     assert manifest["oracle_semantics"] == [
         "R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck",
         "P15-evidence-metadata",
-        "P16-store-busy", "P17-sequence-allocation", "R3-backup-microsecond-domain",
+        "P16-store-busy", "P17-sequence-allocation", "P17-initialization-guard",
+        "P18-intake-only-replay", "R3-backup-microsecond-domain",
     ]
     expected = {
         path.relative_to(CORPUS).as_posix()

@@ -24,7 +24,7 @@ from trajecta_identity.identity import PINNED  # noqa: E402
 
 ORACLE_BASE_COMMIT = "fa21042533826fcfa18bed97f5328166723fcbfa"
 ORACLE_SEMANTICS = ["R0-frozen", "R2a-authority-v2", "P4-decay-v4-refusal", "P5-writer-v4-precheck", "P15-evidence-metadata",
-                    "P16-store-busy", "P17-sequence-allocation", "R3-backup-microsecond-domain"]
+                    "P16-store-busy", "P17-sequence-allocation", "P17-initialization-guard", "P18-intake-only-replay", "R3-backup-microsecond-domain"]
 TABLES = ROOT / "memory_core" / "tables"
 LEGACY_V4 = ROOT / "spec" / "golden" / "identity-open" / "store.sqlite3"
 SOURCES = (

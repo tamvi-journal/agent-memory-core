@@ -178,6 +178,9 @@ async function execute(caseValue: any) {
                   read: () => `RETRACT ${args.record_id}`,
                 });
                 break;
+              case "identity_close_legacy_discussion":
+                result = memory.closeLegacyDiscussion(args.receipt_id);
+                break;
               case "identity_retract":
                 result = memory.retract(args.receipt_id);
                 break;
@@ -204,7 +207,8 @@ async function execute(caseValue: any) {
                 });
                 break;
               case "add_relation":
-                result = memory.store.addRelation({
+              case "retract_relation":
+                result = memory.store[caseValue.call === "add_relation" ? "addRelation" : "retractRelation"]({
                   relationId: args.relation_id,
                   fromRecordId: args.from_record_id,
                   toRecordId: args.to_record_id,
@@ -227,6 +231,7 @@ async function execute(caseValue: any) {
                   actor: args.actor,
                   reason: args.reason,
                   surface: args.surface,
+                  idempotencyKey: args.idempotency_key,
                 });
                 break;
               case "retrieve":

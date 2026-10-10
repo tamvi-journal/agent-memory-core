@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
@@ -74,13 +75,29 @@ class ValidatedIntake:
             payload["idempotency_key"].encode("utf-8")
         ).hexdigest()[:32]
         target = None if payload["operation_type"] == "create" else payload["record_id"]
-        self._insert_intake(
-            intake_id=intake_id,
-            payload=payload,
-            proposal_sha256=proposal_sha256,
-            evidence_ids=evidence_ids,
-            target_record_id=target,
-        )
+        try:
+            # P18 catches only unit 2. Its connection context rolls back and
+            # closes before the fresh lookup; committed unit-1 evidence stays.
+            self._insert_intake(
+                intake_id=intake_id,
+                payload=payload,
+                proposal_sha256=proposal_sha256,
+                evidence_ids=evidence_ids,
+                target_record_id=target,
+            )
+        except sqlite3.IntegrityError as error:
+            try:
+                prior = self._intake_by_key(payload["idempotency_key"])
+            except Exception:
+                # A failed fresh read cannot establish P18's recovery proof.
+                raise error
+            if not prior or prior["intake_id"] != intake_id:
+                raise
+            if prior["proposal_sha256"] != proposal_sha256:
+                raise ValueError(
+                    "idempotency_key already exists with a different proposal"
+                )
+            return prior
         if status in {"held", "rejected", "no_op"}:
             self._decide_intake(
                 intake_id,

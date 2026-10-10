@@ -59,10 +59,11 @@ export type Row = Record<string, string | number | bigint | null>;
 type Header = { applicationId: number; userVersion: number; wal: boolean; empty: boolean };
 type Facts = { applicationId: number; userVersion: number; tables: Set<string> };
 
-function readHeader(path: string): Header {
+function readHeader(path: string, writable = false): Header {
   const absolute = resolve(path);
   for (const suffix of ["-wal", "-shm"]) {
-    if (existsSync(absolute + suffix)) throw new IncompatibleJournalMode(`SQLite WAL sidecar present. ${REPAIR}`);
+    if (!writable && existsSync(absolute + suffix))
+      throw new IncompatibleJournalMode(`SQLite WAL sidecar present. ${REPAIR}`);
   }
   const size = statSync(absolute).size;
   if (size === 0) return { applicationId: 0, userVersion: 0, wal: false, empty: true };
@@ -79,7 +80,9 @@ function readHeader(path: string): Header {
     throw new SchemaVersionError("memory database is not initialized");
   }
   const wal = header[18] === 2 || header[19] === 2;
-  if (wal) throw new IncompatibleJournalMode(`SQLite journal_mode=wal. ${REPAIR}`);
+  if (writable && (header.readInt32BE(60) > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(header.readInt32BE(68))))
+    throw new SchemaVersionError("database application_id/user_version is newer or foreign");
+  if (wal && !writable) throw new IncompatibleJournalMode(`SQLite journal_mode=wal. ${REPAIR}`);
   return { applicationId: header.readInt32BE(68), userVersion: header.readInt32BE(60), wal, empty: false };
 }
 
@@ -544,27 +547,45 @@ export class MemoryStore {
   } {
     this.close();
     if (this.exists() && statSync(this.path).size > 0) {
-      const header = readHeader(this.path);
+      const header = readHeader(this.path, true);
       if (header.applicationId === APPLICATION_ID && header.userVersion === LEGACY_V4_VERSION) {
         throw new MigrationRequired("schema v4 store must be migrated to v5 before writing");
       }
       if (header.userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(header.applicationId)) {
         throw new SchemaVersionError("database application_id/user_version is newer or foreign");
       }
-      const current = this.schemaInfo();
-      if (current.state === "ready") return { ...current, changed: false, migrated_from: null };
     }
     mkdirSync(dirname(this.path), { recursive: true });
     const database = openDatabase(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
     try {
+      // Frozen writable-open repair occurs before the P17 guard transaction.
+      const openedVersion = Number((database.prepare("PRAGMA user_version").get() as Row).user_version);
+      const openedApplication = Number((database.prepare("PRAGMA application_id").get() as Row).application_id);
+      if (openedVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(openedApplication))
+        throw new SchemaVersionError("database application_id/user_version is newer or foreign");
+      const mode = String((database.prepare("PRAGMA journal_mode=DELETE").get() as Row).journal_mode).toLowerCase();
+      if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
+      database.exec("BEGIN IMMEDIATE");
+      const facts = inspect(database),
+        state = classify(facts);
+      if (state === "ready") {
+        database.exec("COMMIT");
+        return {
+          application_id: facts.applicationId,
+          user_version: facts.userVersion,
+          state,
+          changed: false,
+          migrated_from: null,
+        };
+      }
       database.exec(readFileSync(SCHEMA_PATH, "utf8"));
       database.exec(
         `INSERT INTO memory_meta_v3(key,value) VALUES('schema_version','5') ON CONFLICT(key) DO UPDATE SET value=excluded.value; PRAGMA application_id=${APPLICATION_ID}; PRAGMA user_version=${SCHEMA_VERSION};`,
       );
-      const mode = String(
-        (database.prepare("PRAGMA journal_mode=DELETE").get() as Record<string, unknown>).journal_mode,
-      ).toLowerCase();
-      if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
+      database.exec("COMMIT");
+    } catch (error) {
+      if (database.isTransaction) database.exec("ROLLBACK");
+      throw error;
     } finally {
       database.close();
     }

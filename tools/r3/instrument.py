@@ -30,6 +30,11 @@ def instrument(case, units):
         if case.get("capture"):
             units.append(unit)
         committed += 1
+        if case.get("intake_pause_after") == unit["call"]:
+            sys.__stderr__.write("R3-P18-" + unit["call"] + "\n")
+            sys.__stderr__.flush()
+            while not Path(case["p18_release"]).exists():
+                threading.Event().wait(0.01)
         if case.get("crash_after_unit") == committed:
             pause()
     original_now = kernel.utc_now
@@ -53,6 +58,46 @@ def instrument(case, units):
             current["clocks"].append(value)
         return value
     with ExitStack() as stack:
+        if case.get("same_key_gate_role"):
+            original_gate_connection = kernel.MemoryStore._raw_connect
+            gate_scheduled = False
+            class GateConnection:
+                def __init__(self, connection):
+                    self.connection = connection
+                    self.immediate = False
+                def __getattr__(self, name):
+                    return getattr(self.connection, name)
+                def execute(self, sql, *args):
+                    nonlocal gate_scheduled
+                    victim = case["same_key_gate_role"] == "victim"
+                    attempt = victim and not gate_scheduled and sql == "BEGIN IMMEDIATE"
+                    if attempt:
+                        gate_scheduled = True
+                        sys.__stderr__.write("R3-P18-ATTEMPT\n")
+                        sys.__stderr__.flush()
+                    result = self.connection.execute(sql, *args)
+                    if sql == "BEGIN IMMEDIATE":
+                        self.immediate = True
+                    if attempt:
+                        sys.__stderr__.write("R3-P18-ACQUIRED\n")
+                        sys.__stderr__.flush()
+                    table = case["same_key_gate_table"]
+                    if sql.startswith("SELECT") and ("FROM " + table) in sql:
+                        assert self.immediate and self.connection.in_transaction, sql
+                        units.append({"call": "p18_precheck", "table": table, "immediate": True})
+                    if not victim and not gate_scheduled and sql.startswith("INSERT INTO " + table):
+                        assert self.immediate and self.connection.in_transaction, sql
+                        gate_scheduled = True
+                        sys.__stderr__.write("R3-P18-INSERTED\n")
+                        sys.__stderr__.flush()
+                        while not Path(case["p18_release"]).exists():
+                            threading.Event().wait(0.01)
+                    return result
+            @contextmanager
+            def gate_connection(self, **kwargs):
+                with original_gate_connection(self, **kwargs) as conn:
+                    yield GateConnection(conn)
+            stack.enter_context(patch.object(kernel.MemoryStore, "_raw_connect", gate_connection))
         if case.get("allocation_role"):
             original_connect = kernel.MemoryStore._raw_connect
             @contextmanager

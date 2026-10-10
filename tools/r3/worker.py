@@ -102,6 +102,8 @@ def execute(case):
                     try:
                         if case["call"] in {"revise", "invalidate", "retract_relation"}:
                             result = getattr(memory.store, case["call"])(**case.get("arguments", {}))
+                        elif case["call"] == "identity_close_legacy_discussion":
+                            result = memory.identity_close_legacy_discussion(case["arguments"]["receipt_id"])
                         elif case["call"] in {"identity_core_propose", "owner_approve_core", "identity_core_apply", "owner_approve_retract", "identity_retract"}:
                             result = authority_invoke(memory, case["call"], case.get("arguments", {}), {})
                         else:

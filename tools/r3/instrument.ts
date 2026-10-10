@@ -33,8 +33,64 @@ function snake(value: any): any {
   );
 }
 export function instrument(store: MemoryStore, clock: any, config: any, units: any[]): () => void {
-  if (!config.capture && !config.crash && !config.crash_after_unit && !config.allocation_role) return () => {};
+  if (
+    !config.capture &&
+    !config.crash &&
+    !config.crash_after_unit &&
+    !config.allocation_role &&
+    !config.intake_pause_after &&
+    !config.same_key_gate_role
+  )
+    return () => {};
   const originalExec = DatabaseSync.prototype.exec;
+  const originalPrepare = DatabaseSync.prototype.prepare;
+  if (config.same_key_gate_role) {
+    let gateScheduled = false;
+    const immediate = new WeakSet<DatabaseSync>();
+    DatabaseSync.prototype.exec = function (sql: string) {
+      const attempt = config.same_key_gate_role === "victim" && !gateScheduled && sql === "BEGIN IMMEDIATE";
+      if (attempt) {
+        gateScheduled = true;
+        writeSync(2, "R3-P18-ATTEMPT\n");
+      }
+      const result = originalExec.call(this, sql);
+      if (sql === "BEGIN IMMEDIATE") immediate.add(this);
+      if (sql === "COMMIT" || sql === "ROLLBACK") immediate.delete(this);
+      if (attempt) writeSync(2, "R3-P18-ACQUIRED\n");
+      return result;
+    };
+    DatabaseSync.prototype.prepare = function (sql: string) {
+      const statement = originalPrepare.call(this, sql),
+        database = this;
+      return new Proxy(statement, {
+        get(target, key) {
+          const value = Reflect.get(target, key, target);
+          if (typeof value !== "function") return value;
+          return (...args: unknown[]) => {
+            if (sql.startsWith("SELECT") && sql.includes("FROM " + config.same_key_gate_table)) {
+              if (!immediate.has(database) || !database.isTransaction)
+                throw new Error("P18 pre-check outside immediate transaction: " + sql);
+              units.push({ call: "p18_precheck", table: config.same_key_gate_table, immediate: true });
+            }
+            const result = Reflect.apply(value, target, args);
+            if (
+              key === "run" &&
+              config.same_key_gate_role === "holder" &&
+              !gateScheduled &&
+              sql.startsWith("INSERT INTO " + config.same_key_gate_table)
+            ) {
+              if (!immediate.has(database) || !database.isTransaction)
+                throw new Error("P18 insert outside immediate transaction");
+              gateScheduled = true;
+              writeSync(2, "R3-P18-INSERTED\n");
+              while (!existsSync(config.p18_release)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+            }
+            return result;
+          };
+        },
+      });
+    };
+  }
   let scheduled = false;
   const resume = (role: string) => {
     writeSync(2, `R3-ALLOCATION-${role}\n`);
@@ -57,6 +113,10 @@ export function instrument(store: MemoryStore, clock: any, config: any, units: a
   const complete = (unit: any) => {
     if (config.capture) units.push(unit);
     committed++;
+    if (config.intake_pause_after === unit.call) {
+      writeSync(2, `R3-P18-${unit.call}\n`);
+      while (!existsSync(config.p18_release)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
     if (Number(config.crash_after_unit?.value ?? config.crash_after_unit) === committed) pause();
   };
   let proposal: any = null,
@@ -175,6 +235,7 @@ export function instrument(store: MemoryStore, clock: any, config: any, units: a
   return () => {
     (ValidatedIntake.prototype as any).normalized = originalNormalized;
     DatabaseSync.prototype.exec = originalExec;
+    DatabaseSync.prototype.prepare = originalPrepare;
     hooks.afterCreateRevisionInsert = null;
     hooks.afterAuthorityRevisionInsert = null;
   };

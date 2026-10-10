@@ -215,23 +215,40 @@ export class ValidatedIntake {
     );
     const intakeId = `intake:${sha256(p.idempotency_key).slice(0, 32)}`,
       target = p.operation_type === "create" ? null : p.record_id;
-    this.store.transaction((db) =>
-      db
-        .prepare(
-          "INSERT INTO memory_intake_v3(intake_id,operation_type,target_record_id,proposal_sha256,evidence_ids_json,status,decision_reason,operation_id,actor,surface,idempotency_key,created_at,decided_at) VALUES(?,?,?,?,?,'received','',NULL,?,?,?,?,NULL)",
-        )
-        .run(
-          intakeId,
-          p.operation_type,
-          target,
-          proposalSha,
-          pyJsonDumps(evidenceIds),
-          p.actor,
-          this.surface,
-          p.idempotency_key,
-          this.store.now(),
-        ),
-    );
+    try {
+      this.store.transaction((db) =>
+        db
+          .prepare(
+            "INSERT INTO memory_intake_v3(intake_id,operation_type,target_record_id,proposal_sha256,evidence_ids_json,status,decision_reason,operation_id,actor,surface,idempotency_key,created_at,decided_at) VALUES(?,?,?,?,?,'received','',NULL,?,?,?,?,NULL)",
+          )
+          .run(
+            intakeId,
+            p.operation_type,
+            target,
+            proposalSha,
+            pyJsonDumps(evidenceIds),
+            p.actor,
+            this.surface,
+            p.idempotency_key,
+            this.store.now(),
+          ),
+      );
+    } catch (error) {
+      // transaction() has rolled back and closed. Only unit-2 constraints qualify.
+      const code = (error as { errcode?: unknown } | null)?.errcode;
+      if (typeof code !== "number" || (code & 0xff) !== 19) throw error;
+      let prior: Record<string, unknown> | undefined;
+      try {
+        prior = this.store.all("SELECT * FROM memory_intake_v3 WHERE idempotency_key=?", p.idempotency_key)[0];
+      } catch {
+        // A failed fresh read cannot establish P18's recovery proof.
+        throw error;
+      }
+      if (!prior || prior.intake_id !== intakeId) throw error;
+      if (prior.proposal_sha256 !== proposalSha)
+        throw new ValueError("idempotency_key already exists with a different proposal");
+      return this.intake(String(p.idempotency_key));
+    }
     if (["held", "rejected", "no_op"].includes(status)) {
       this.decide(intakeId, status, reason, target, null);
       return this.intake(p.idempotency_key);

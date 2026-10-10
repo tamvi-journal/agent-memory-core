@@ -36,7 +36,7 @@ jobs:
       - name: Install test helpers
         run: python -m pip install -e ".[test]"
       - name: Focused laws and synthetic rehearsal only
-        run: python -W error::ResourceWarning -m pytest -q tests/test_r3_allocation.py tests/test_r3_backup_time.py tests/test_r3_busy.py tests/test_r3_evidence.py tests/test_r3_g2.py tests/test_r3_harness.py tests/test_r3_fuzz.py tests/test_r3_usage.py tests/test_r3_rehearsal.py
+        run: python -W error::ResourceWarning -m pytest -q tests/test_r3_fixture_headers.py tests/test_r3_idempotency.py tests/test_r3_allocation.py tests/test_r3_backup_time.py tests/test_r3_busy.py tests/test_r3_evidence.py tests/test_r3_g2.py tests/test_r3_harness.py tests/test_r3_fuzz.py tests/test_r3_usage.py tests/test_r3_rehearsal.py
       - name: X fixed matrix and all 200 seeds
         run: python tools/r3/run.py > .isolation/r3-reports/sequential.jsonl
       - name: X real process kills and opposite-runtime retries

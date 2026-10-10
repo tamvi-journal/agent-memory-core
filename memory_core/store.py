@@ -301,14 +301,16 @@ class MemoryStore:
                 "state": "uninitialized",
             }
         with self._raw_connect(readonly=True) as conn:
-            application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
-            user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-            tables = {
-                row["name"]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
-            }
+            return self._schema_info_in(conn)
+
+    @staticmethod
+    def _schema_info_in(conn: sqlite3.Connection) -> dict[str, Any]:
+        application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        tables = {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
         if application_id == APPLICATION_ID and user_version == SCHEMA_VERSION:
             state = "ready"
         elif user_version > SCHEMA_VERSION or (
@@ -339,46 +341,39 @@ class MemoryStore:
         remains for existing consumers, but it is only used on write paths.
         """
 
-        # initialize is a writable open, so reconcile a persisted WAL header
-        # before schema_info performs its fail-closed read.
-        with self._raw_connect():
-            pass
-        before = self.schema_info()
-        if before["state"] == "ready":
-            return {**before, "changed": False}
-        if before["state"] == "incompatible":
-            raise SchemaVersionError(
-                "database application_id/user_version is newer or foreign"
-            )
-        if before["state"] == "legacy-v4":
-            raise MigrationRequiredError(
-                "schema v4 store must be migrated to v5 before writing"
-            )
-        if before["state"] in {"legacy-v2", "legacy-v3"} and not migrate:
-            raise MigrationRequiredError(
-                f"{before['state']} store requires migration"
-            )
-
         schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+        existed = self.db_path.exists()
         with self._raw_connect() as conn:
-            application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
-            user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-            if user_version > SCHEMA_VERSION:
+            conn.execute("BEGIN IMMEDIATE")
+            before = self._schema_info_in(conn)
+            if not existed and before["state"] == "unknown":
+                before["state"] = "uninitialized"
+            if before["state"] == "ready":
+                return {**before, "changed": False}
+            if before["state"] == "incompatible":
                 raise SchemaVersionError(
-                    f"database user_version {user_version} exceeds {SCHEMA_VERSION}"
+                    "database application_id/user_version is newer or foreign"
                 )
-            if application_id not in {0, APPLICATION_ID}:
-                raise SchemaVersionError(
-                    f"foreign application_id {application_id}; expected {APPLICATION_ID}"
+            if before["state"] == "legacy-v4":
+                raise MigrationRequiredError(
+                    "schema v4 store must be migrated to v5 before writing"
                 )
+            if before["state"] in {"legacy-v2", "legacy-v3"} and not migrate:
+                raise MigrationRequiredError(f"{before['state']} store requires migration")
             tables = {
                 row["name"]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
-            conn.executescript(schema)
-            conn.execute("BEGIN IMMEDIATE")
+            # executescript commits a pending transaction. Execute complete
+            # statements individually to retain the guard's immediate lock.
+            statement = ""
+            for line in schema.splitlines(keepends=True):
+                statement += line
+                if sqlite3.complete_statement(statement):
+                    conn.execute(statement)
+                    statement = ""
+            if statement.strip():
+                raise RuntimeError("incomplete schema SQL")
             if "memory_records_v2" in tables:
                 self._migrate_v2(conn)
             self._backfill_relation_events(conn)

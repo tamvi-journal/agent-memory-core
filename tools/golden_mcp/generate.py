@@ -36,6 +36,8 @@ ORACLE_SEMANTICS = [
     "P16-store-busy",
     "P15-evidence-metadata",
     "P17-sequence-allocation",
+    "P17-initialization-guard",
+    "P18-intake-only-replay",
     "R3-backup-microsecond-domain",
 ]
 TABLES = ROOT / "memory_core" / "tables"
