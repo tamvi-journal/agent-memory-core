@@ -379,7 +379,7 @@ that is, the same whole microsecond. It applies only to the `migrate-to` backup,
 
 ### 3.7 Windows filesystem law (Codex @ b67914f, draft #31)
 
-**W1. Backup mtime domain on Windows (P19, oracle patch, both runtimes; amends §3.6).** On Windows, Node 22 cannot round-trip the upper part of the §3.6 domain. A requested mtime of `-1 ns` reads back as `4294967295999999900`. The midpoint set at the supported maximum reads back as `0`. At `2^32 s`, both bigint and plain stat read `0`. Python reads all three correctly. Real file times sit near 1.7·10^18 ns, far from both edges, so this is a boundary artifact, not a data risk.
+**W1. Backup mtime domain on Windows (P19, oracle patch, both runtimes; amends §3.6).** On Windows, Node 22 cannot round-trip the upper part of the §3.6 domain. A requested mtime of `-1 ns` reads back as `4294967295999999900`. The midpoint set at the supported maximum reads back as `0`. At `2^32 s`, both bigint and plain stat read `0`. Python reads all three correctly. Real file times sit near 1.7·10^18 ns, far from both edges, so this was initially interpreted as a boundary artifact. **That explanation is superseded by W1b below:** the Windows setter quantizes times for every date.
 - **The common domain is OS-specific and the same in both runtimes on each OS.** POSIX (Linux, macOS) keeps `0 ≤ mtime_ns < 2^32·10^9`. **Windows uses `0 ≤ mtime_ns < 2^31·10^9`** (up to 2038-01-19 03:14:08 UTC). Outside the domain, both runtimes raise the same `ValueError("source mtime is outside the supported backup range")`, at refusal position 5 of §3.6, with no side effects.
 - A source mtime that **reads back** outside the domain is refused, whatever was requested. On Windows the `-1 ns` probe therefore refuses in both runtimes: Python reads `-100`, Node reads a value ≥ `2^31·10^9`.
 - **Windows edge tests:** supported `0` and `2^31·10^9 − 1` must pass the whole §3.6 path, including set and read-back. Unsupported `2^31·10^9` and a pre-epoch value must be refused identically. Every other §3.6 law (whole-microsecond equality, the midpoint set, read-back, cleanup on verify failure, the refusal order 1–9) is unchanged.
@@ -485,7 +485,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ 7b8a678 (pending Lam's ack):** Node on Windows sets mtimes on a 1.6 µs grid (libuv binary64), so the Windows TS backup uses `CopyFileW` time preservation plus read-back, without `utimes` (§3.7 W1b).
+- **Codex @ 7b8a678 (settled with Lam @ 65847b1, #33):** Node on Windows sets mtimes on a 1.6 µs grid (libuv binary64), so the Windows TS backup uses `CopyFileW` time preservation plus read-back, without `utimes` (§3.7 W1b).
 - **Codex @ b67914f (settled with Lam @ b952a30, #32):** the Windows backup-mtime domain is `[0, 2^31 s)` (P19, §3.7 W1); `.last-profile` is always LF and readers accept CRLF (P20, §3.7 W2).
 - **Codex @ 2624e10 (settled with Lam @ 94ee892):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
 - **Codex @ 0d3e00d (settled with Lam @ 1444390):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).

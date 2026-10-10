@@ -2,7 +2,7 @@
 import "../../node/src/sqlite-warning.ts";
 import { createInterface } from "node:readline";
 import { resolve, relative, isAbsolute } from "node:path";
-import { realpathSync as realpath, existsSync, readFileSync, utimesSync, unlinkSync } from "node:fs";
+import { realpathSync as realpath, existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import type { JsonValue } from "../../node/src/encoding.ts";
 // Load SQLite only after the existing exact G7 diagnostic filter is installed.
 const { main: cliMain } = await import("../../node/src/cli.ts");
@@ -39,14 +39,19 @@ async function execute(caseValue: any) {
   for (const key of Object.keys(process.env)) delete process.env[key];
   for (const [key, value] of Object.entries(caseValue.env)) process.env[key] = value as string;
   const { hooks } = await import("../../node/src/internal-hooks.ts");
-  hooks.beforeBackupTimeSet =
+  hooks.beforeBackupVerify =
     caseValue.backup_fault === "set"
       ? () => {
-          throw new Error("synthetic time-set failure");
+          throw new Error("synthetic backup verification failure");
         }
       : null;
-  hooks.afterBackupTimeSet = caseValue.backup_fault === "readback" ? (path) => utimesSync(path, 0, 0) : null;
-  if (caseValue.backup_fault === "readback-missing") hooks.afterBackupTimeSet = (path) => unlinkSync(path);
+  hooks.readBackupMtimeNs = caseValue.backup_fault === "readback" ? () => 0n : null;
+  if (caseValue.backup_fault === "readback-missing") {
+    hooks.readBackupMtimeNs = (path) => {
+      unlinkSync(path);
+      return statSync(path, { bigint: true }).mtimeNs;
+    };
+  }
   const root = realpath(caseValue.root);
   const database = caseValue.database ?? "store.sqlite3";
   contain(root, resolve(root, database));

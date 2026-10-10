@@ -15,13 +15,18 @@ export function sourceBackupTime(path: string): bigint {
 export function copyBackup(source: string, backup: string, ns: bigint): void {
   copyFileSync(source, backup);
   try {
-    const sec = ns / 1_000_000_000n;
-    const micros = (ns % 1_000_000_000n) / 1000n;
-    const midpoint = Number(sec) + Number(micros * 1000n + 500n) / 1e9;
-    hooks.beforeBackupTimeSet?.();
-    utimesSync(backup, statSync(source).atime, midpoint);
-    hooks.afterBackupTimeSet?.(backup);
-    if (statSync(backup, { bigint: true }).mtimeNs / 1000n !== ns / 1000n) {
+    hooks.beforeBackupVerify?.();
+    // W1b: CopyFileW preserves Windows last-write time. libuv setters lose µs.
+    if (process.platform !== "win32") {
+      const sec = ns / 1_000_000_000n;
+      const micros = (ns % 1_000_000_000n) / 1000n;
+      const midpoint = Number(sec) + Number(micros * 1000n + 500n) / 1e9;
+      utimesSync(backup, statSync(source).atime, midpoint);
+    }
+    const actual = hooks.readBackupMtimeNs
+      ? hooks.readBackupMtimeNs(backup)
+      : statSync(backup, { bigint: true }).mtimeNs;
+    if (actual / 1000n !== ns / 1000n) {
       throw new Error("backup microsecond differs");
     }
   } catch {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import fs, { copyFileSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -140,4 +141,40 @@ test("P15 accepts absent/empty strings and JSON-valued source_payload", () => {
   });
   assert.equal((result.revision as any).record_id, "p15");
   store.close();
+});
+
+test("W1b Windows public migration never calls utimes or futimes", { skip: process.platform !== "win32" }, () => {
+  const { root, path, store } = fixture(true);
+  const backup = resolve(root, "backup.sqlite3");
+  const target = resolve(root, "target.sqlite3");
+  const sourceBytes = readFileSync(path);
+  const before = statSync(path, { bigint: true });
+  const savedUt = fs.utimesSync;
+  const savedFut = fs.futimesSync;
+  let setterCalls = 0;
+  const refusedSetter = () => {
+    setterCalls++;
+    throw new Error("W1b forbids time setters for Windows backups");
+  };
+  fs.utimesSync = refusedSetter;
+  fs.futimesSync = refusedSetter;
+  syncBuiltinESMExports();
+  try {
+    const migrated = store.migrateTo(target, { backupPath: backup }) as MemoryStore;
+    assert.equal(migrated.schemaInfo().state, "ready");
+    migrated.close();
+    assert.equal(setterCalls, 0);
+    assert.deepEqual(readFileSync(backup), sourceBytes);
+    assert.equal(statSync(backup, { bigint: true }).mtimeNs / 1000n, before.mtimeNs / 1000n);
+    const after = statSync(path, { bigint: true });
+    assert.deepEqual(readFileSync(path), sourceBytes);
+    assert.equal(after.mtimeNs, before.mtimeNs);
+    assert.equal(after.mode, before.mode);
+    assert.deepEqual(readdirSync(root).sort(), ["backup.sqlite3", "store.sqlite3", "target.sqlite3"]);
+  } finally {
+    fs.utimesSync = savedUt;
+    fs.futimesSync = savedFut;
+    syncBuiltinESMExports();
+    store.close();
+  }
 });

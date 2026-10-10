@@ -14,6 +14,7 @@ from tools.r3.run import run_case
 ROOT = Path(__file__).resolve().parents[1]
 UPPER = (1 << (31 if sys.platform == "win32" else 32)) * 10**9
 MODERN = 1700000000123456000
+REAL_2026 = 1790812800123456700  # 2026-10-01 UTC, nonzero sub-microsecond.
 
 
 def migration(tmp_path, runtime, mtime, *, gate=None, fault=None):
@@ -40,7 +41,10 @@ def migration(tmp_path, runtime, mtime, *, gate=None, fault=None):
             cwd=tmp_path, env=env, capture_output=True, timeout=30, check=True)
         assert not probe.stderr
         runtime_ns = int(probe.stdout)
+    assert (0 <= actual < UPPER) == (0 <= mtime < UPPER), (mtime, actual)
     assert (0 <= runtime_ns < UPPER) == (0 <= actual < UPPER), (mtime, actual, runtime_ns)
+    if mtime == REAL_2026:
+        assert actual == REAL_2026 and actual % 1000 == 700, actual
     print(json.dumps({"runtime": runtime, "requested_ns": mtime, "python_read_ns": actual, "runtime_read_ns": runtime_ns, "domain_upper": UPPER}))
     target, backup = tmp_path / "target.sqlite3", tmp_path / "backup.sqlite3"
     if gate == "target": target.write_bytes(b"existing target")
@@ -61,7 +65,7 @@ def migration(tmp_path, runtime, mtime, *, gate=None, fault=None):
 
 
 @pytest.mark.parametrize("runtime", ["py", "ts"])
-@pytest.mark.parametrize("mtime", [0, UPPER - 1, *(MODERN + x for x in [0, 1, 499, 500, 999, 1999])])
+@pytest.mark.parametrize("mtime", [0, UPPER - 1, REAL_2026, *(MODERN + x for x in [0, 1, 499, 500, 999, 1999])])
 def test_backup_supported_precision_edges(tmp_path, runtime, mtime):
     out, source, target, backup = migration(tmp_path, runtime, mtime)
     assert out["exit"] == 0 and not out["stderr"], out
