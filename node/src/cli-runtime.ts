@@ -19,6 +19,7 @@ import {
   ProposalDecided,
   StaleAuthority,
   SchemaVersionError,
+  StoreBusy,
   PinnedRecordError,
   FileExistsError,
   ValueError,
@@ -38,6 +39,7 @@ const PUBLIC_ERRORS = [
   ProposalDecided,
   StaleAuthority,
   SchemaVersionError,
+  StoreBusy,
   PinnedRecordError,
   WorkStoreError,
   FileExistsError,
@@ -121,11 +123,14 @@ const GRAMMAR: Record<string, Grammar> = {
   "migrate-to": { positionals: ["target"], flags: ["dry-run"], values: ["backup"] },
 };
 const dest = (key: string) => key.replaceAll("-", "_");
-function usage(message: string): never {
-  throw new CliExit(2, `trajecta-identity: error: ${message}`);
+function usage(message: string, prog = "trajecta-identity"): never {
+  throw new CliExit(2, `${prog}: error: ${message}`);
 }
 export function parseArgs(argv: string[]): Record<string, any> {
   const result: Record<string, any> = {};
+  const extras: string[] = [];
+  const commandUsage = (message: string): never =>
+    usage(message, result.command ? `trajecta-identity ${result.command}` : "trajecta-identity");
   let grammar: Grammar = { values: ["profile", "db"] },
     positional = 0,
     ended = false;
@@ -145,17 +150,30 @@ export function parseArgs(argv: string[]): Record<string, any> {
         key = "profile";
         inline = token.length > 2 ? token.slice(2) : undefined;
       } else {
+        if (!token.startsWith("--")) {
+          extras.push(token);
+          continue;
+        }
         const parts = token.slice(2).split("=");
         key = parts.shift()!;
         inline = parts.length ? parts.join("=") : undefined;
         const candidates = [...(grammar.values ?? []), ...(grammar.flags ?? [])].filter((name) => name.startsWith(key));
         if (!candidates.includes(key)) {
-          if (candidates.length !== 1) usage(`unrecognized or ambiguous argument: ${token}`);
+          if (!candidates.length) {
+            extras.push(token);
+            continue;
+          }
+          if (candidates.length !== 1) commandUsage(`ambiguous argument: ${token}`);
           key = candidates[0];
         }
       }
       if ((grammar.flags ?? []).includes(key)) {
-        if (inline !== undefined) usage(`argument --${key}: ignored explicit argument`);
+        if (inline !== undefined) commandUsage(`argument --${key}: ignored explicit argument`);
+        if (
+          result.command === "approve-core" &&
+          ((key === "apply" && result.reject) || (key === "reject" && result.apply))
+        )
+          commandUsage("argument --apply/--reject: not allowed with the other outcome");
         result[dest(key)] = true;
       } else if ((grammar.values ?? []).includes(key)) {
         const value = inline ?? argv[++i];
@@ -163,12 +181,12 @@ export function parseArgs(argv: string[]): Record<string, any> {
           value === undefined ||
           (value.startsWith("-") && value !== "-" && !argparseNegative(value) && inline === undefined)
         )
-          usage(`argument --${key}: expected one argument`);
+          commandUsage(`argument --${key}: expected one argument`);
         if (key === "limit" || key === "budget") {
           try {
             result[key] = parseIntToken(value);
           } catch {
-            usage(`argument --${key}: invalid int value`);
+            commandUsage(`argument --${key}: invalid int value`);
           }
         } else result[dest(key)] = value;
       } else usage(`unrecognized arguments: ${token}`);
@@ -179,15 +197,16 @@ export function parseArgs(argv: string[]): Record<string, any> {
       Object.assign(result, grammar.defaults ?? {});
     } else {
       const name = grammar.positionals?.[positional++];
-      if (!name) usage(`unrecognized arguments: ${token}`);
-      result[name] = token;
+      if (!name) extras.push(token);
+      else result[name] = token;
     }
   }
   if (!result.command) usage("the following arguments are required: command");
   for (const required of [...(grammar.positionals ?? []), ...(grammar.required ?? [])])
-    if (result[dest(required)] === undefined) usage(`the following arguments are required: ${required}`);
+    if (result[dest(required)] === undefined) commandUsage(`the following arguments are required: ${required}`);
   if (result.command === "approve-core" && Boolean(result.apply) === Boolean(result.reject))
-    usage("exactly one of --apply or --reject is required");
+    commandUsage("exactly one of --apply or --reject is required");
+  if (extras.length) usage(`unrecognized arguments: ${extras.join(" ")}`);
   return result;
 }
 export function confirmationLine(read: () => Uint8Array): string {

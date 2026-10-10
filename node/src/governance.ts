@@ -198,16 +198,20 @@ export class ValidatedIntake {
     }
     this.validate(p);
     const [status, reason] = this.evaluate(p);
+    // Python dict.setdefault supplies only absent keys; present nulls reach P15.
+    const withDefaults = (item: Evidence): Evidence => {
+      const evidence = { ...item };
+      const defaults = {
+        actor: p.actor,
+        surface: this.surface,
+        model_family: p.model_family,
+        privacy_class: "private",
+      };
+      for (const [key, value] of Object.entries(defaults)) if (!Object.hasOwn(evidence, key)) evidence[key] = value;
+      return evidence;
+    };
     const evidenceIds = this.store.transaction((db) =>
-      p.evidence.map((item: Evidence) =>
-        insertEvidence(this.store, db, {
-          ...item,
-          actor: item.actor ?? p.actor,
-          surface: item.surface ?? this.surface,
-          model_family: item.model_family ?? p.model_family,
-          privacy_class: item.privacy_class ?? "private",
-        }),
-      ),
+      p.evidence.map((item: Evidence) => insertEvidence(this.store, db, withDefaults(item))),
     );
     const intakeId = `intake:${sha256(p.idempotency_key).slice(0, 32)}`,
       target = p.operation_type === "create" ? null : p.record_id;
@@ -232,13 +236,7 @@ export class ValidatedIntake {
       this.decide(intakeId, status, reason, target, null);
       return this.intake(p.idempotency_key);
     }
-    const primary = {
-      ...p.evidence[0],
-      actor: p.evidence[0].actor ?? p.actor,
-      surface: p.evidence[0].surface ?? this.surface,
-      model_family: p.evidence[0].model_family ?? p.model_family,
-      privacy_class: p.evidence[0].privacy_class ?? "private",
-    };
+    const primary = withDefaults(p.evidence[0]);
     let result: Record<string, unknown>;
     const key = `intake:${p.idempotency_key}`;
     if (p.operation_type === "create")

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { InjectedClock, MemoryStore, orderedObject, pyFloat, pyInt } from "../src/index.ts";
 import { MigrationRequired, ValueError } from "../src/errors.ts";
+import { ValidatedIntake, DEFAULT_POLICY } from "../src/governance.ts";
 
 const FIELDS = [
   "evidence_type",
@@ -48,6 +49,52 @@ const create = (store: MemoryStore, evidence: Record<string, unknown>) =>
     evidence,
     idempotencyKey: "p15",
   });
+
+test("R3 relation with absent endpoints preserves Python's native FK refusal", () => {
+  const { path, store } = fixture();
+  const before = readFileSync(path);
+  assert.throws(
+    () => store.addRelation({ relationId: "missing", fromRecordId: "a", toRecordId: "b", relationType: "supports" }),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.constructor.name === "IntegrityError" &&
+      error.message === "FOREIGN KEY constraint failed",
+  );
+  store.close();
+  assert.deepEqual(readFileSync(path), before);
+});
+
+// Z found nulls erased by intake's defaults before they reached P15 insertion.
+for (const field of ["actor", "surface", "model_family", "privacy_class"])
+  for (const [kind, value] of INVALID) {
+    test(`P15 intake preserves present ${field}/${kind} until insertion validation`, () => {
+      const { path, root, store } = fixture();
+      const before = readFileSync(path);
+      const intake = new ValidatedIntake(store, { surface: "golden", policy: DEFAULT_POLICY });
+      assert.throws(
+        () =>
+          intake.submit({
+            operation_type: "create",
+            record_id: "synthetic-r3",
+            record_class: "event",
+            domain: "phase",
+            actor: "synthetic",
+            reason: "synthetic",
+            logic: "synthetic",
+            truth_basis: "synthetic",
+            changes: { title: "Synthetic" },
+            idempotency_key: "synthetic:r3",
+            evidence: [
+              { source_ref: "synthetic:r3", content_summary: "synthetic", confidence: pyFloat(0.9), [field]: value },
+            ],
+          }),
+        (error: unknown) => error instanceof ValueError && error.message === `evidence.${field} must be a string`,
+      );
+      store.close();
+      assert.deepEqual(readFileSync(path), before);
+      assert.deepEqual(readdirSync(root), ["store.sqlite3"]);
+    });
+  }
 
 for (const field of FIELDS)
   for (const [kind, value] of INVALID) {
