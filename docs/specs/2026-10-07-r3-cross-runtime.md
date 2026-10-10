@@ -249,6 +249,15 @@ Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. T
 
 **Tests.** The Codex schedules become deterministic regressions in both directions (Python victim / TS holder, and TS victim / Python holder) for `close-loop` and `revise`. Each result must equal one serial order (§2.3), with no `IntegrityError` and no untyped error.
 
+**P17 initialization guard: SQLite header counters (Codex @ 0d3e00d).** In both runtimes, the readiness and legacy guard of `initialize` used to run outside the write transaction. Under P17, it now runs inside one `BEGIN IMMEDIATE` that also covers the schema writes. Python therefore executes the schema statements one at a time, because `executescript` would commit the open transaction. `schema.sql` is unchanged. One side effect is that fewer commits happen, so regenerating the checked-in `.sqlite3` fixtures changes **only** two SQLite header fields: the file change counter at offsets 24–27 and version-valid-for at offsets 92–95. For example, bootstrap goes from 65 to 17.
+
+**Law (declared corpus impact; it narrows the "byte-identical" wording of §3.5b and §5 for this case only).**
+- In checked-in `.sqlite3` files whose generation passes through `initialize`, only header bytes **24–27 and 92–95** may change. Everything else must stay byte-identical: every other header byte, every page, the file size, dumps, schema records, scripts, cases and every non-SQLite payload. The one exception is `MANIFEST.json`, whose digests and provenance are refreshed to match the changed `.sqlite3` files and nothing else.
+- The generator or a test enforces this mechanically. Each old and new file is compared with exactly those 8 bytes masked, and the result must be equal. Any other differing byte → STOP.
+- The commit lists every changed `.sqlite3` file, in every corpus.
+- At runtime, `initialize` on an already-ready store **in DELETE journal mode** is a read-only transaction. It must leave the store's bytes, mtime and sidecars unchanged (the R2d §5.2 "unchanged" class), in both runtimes, and a regression asserts this. The frozen WAL repair still applies: a ready store whose header is in WAL mode is converted to DELETE on a writable open (`store.py` `_raw_connect`, pinned by `test_owned_wal_converts_to_delete_on_writable_open`), and that conversion happens before the guard transaction.
+- This permission does not extend to any other P17 or P18 site. Any other change to SQLite bytes still requires a STOP.
+
 ### 3.5c P18: same-key intake race resolves through replay (oracle patch, both runtimes)
 
 **Finding (Codex @ be9f9fc).** The schedule, in both directions:
@@ -450,6 +459,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ 0d3e00d (pending Lam's ack):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
 - **Codex @ be9f9fc (Lam: ACK in substance; B1, B2 and the site-scope ruling folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
