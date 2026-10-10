@@ -281,6 +281,18 @@ The final store is a valid unit-level serialization (§2.3: the serial unit is t
 
 If any site differs in any of these, STOP and bring it back for review. Do not generalize from "it also has a UNIQUE constraint".
 
+**Scope ruling (Codex inventory @ be9f9fc, `docs/specs/r3-p18-idempotency-sites.md`).** P18 recovery applies to **intake `submit` only**. For every other inventoried site, the existing replay rule is kept exactly as it is (G1 frozen). No digest comparison or mismatch refusal is added, and receipt integrity still runs before replay:
+- the operations of `create_current`, `revise`, `invalidate` and `apply_maintenance` keep their unconditional replay of the prior operation result;
+- relation add and retract keep `status="duplicate"`;
+- core proposal creation keeps `status="existing"` by `proposal_sha256`;
+- the three receipt consumers keep their order: integrity, purpose, profile and authority checks, then the `_replay_in` / `#replay` mapping, including `ReceiptIntegrityError`;
+- the initialization and migration guards are excluded from P18.
+
+These sites need no recovery because their pre-check and their insert already run inside **one** `BEGIN IMMEDIATE` transaction (the P17 boundary). A same-key loser therefore waits, then sees the committed row on its pre-check and replays it. The race intake has cannot occur at these sites. This must be **proven, not assumed**:
+- For each excluded public site, add one deterministic same-key gate regression in both directions. The winner holds its write transaction after the insert. The loser must block, then return exactly the site's existing replay result, or `StoreBusy` past the busy timeout. It must never return an `IntegrityError`.
+- For each initialization or migration guard whose marker or existence read is **not** already inside the write transaction, P17 applies: move the read inside it. List each guard as "already inside" or "moved".
+- If any site turns out not to hold `BEGIN IMMEDIATE` around both its pre-check and its insert, STOP and report it.
+
 **Tests.** Deterministic gate regressions in both directions (Python loser / TS winner, and the reverse) for:
 - an identical proposal: the loser returns the same bytes a serial replay at that point returns;
 - a different proposal with the same key: the loser raises the typed `ValueError`.
@@ -438,7 +450,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ be9f9fc (Lam: ACK in substance; B1 and B2 folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
+- **Codex @ be9f9fc (Lam: ACK in substance; B1, B2 and the site-scope ruling folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
