@@ -385,6 +385,12 @@ that is, the same whole microsecond. It applies only to the `migrate-to` backup,
 - **Windows edge tests:** supported `0` and `2^31·10^9 − 1` must pass the whole §3.6 path, including set and read-back. Unsupported `2^31·10^9` and a pre-epoch value must be refused identically. Every other §3.6 law (whole-microsecond equality, the midpoint set, read-back, cleanup on verify failure, the refusal order 1–9) is unchanged.
 - **If Node on Windows still fails a supported Windows edge:** STOP and report the probe. Do not narrow the domain further on your own.
 
+**W1b. The Windows TS setter (Codex @ 7b8a678; amends W1 and §3.6 for Node on Windows).** The supported maximum still failed in Node. The root cause is in libuv and is not a boundary artifact. `src/win/fs.c` `TIME_T_TO_FILETIME` computes `time * TICKS_PER_SEC + WIN_TO_UNIX_TICK_OFFSET` in **binary64**. That sum is about 1.3·10^17 ticks, where binary64 spacing is 16 ticks (1.6 µs). So `fs.utimesSync` on Windows can only land on a 1.6 µs grid, for **every** date and not only near 2^31 s, and some whole microseconds cannot be reached at all. No choice of midpoint or bound can fix the setter.
+- **Law (TS on Windows only).** Do not call `utimesSync` or `futimesSync` for the backup. Create the backup with `fs.copyFileSync`, which libuv implements on Windows with `CopyFileW`, and `CopyFileW` copies the source last-write time exactly, at 100 ns resolution. Then run the §3.6 read-back verification unchanged: the backup and the source must be in the same whole microsecond, otherwise clean up and raise `ValueError("backup mtime could not be preserved to a microsecond")`. Refusal order 1–9 is unchanged; the "copy+set+readback" step on Windows becomes "copy+readback".
+- POSIX TS and Python (every OS) are unchanged. The P19 Windows domain `[0, 2^31·10^9)` stays as settled; do not widen or narrow it here.
+- **Merge gate (unchanged):** on Windows CI, supported 0 and `2^31·10^9 − 1` pass end-to-end in both runtimes, and unsupported values refuse identically. Add one real-date case in the same run (a fixed 2026 timestamp with a non-zero sub-microsecond part).
+- **If `CopyFileW` does not preserve the time to the microsecond on the CI runner:** STOP with the probe. Do not add a setter, retry or tolerance.
+
 **W2. `.last-profile` line ending (P20, oracle patch, Python).** On Windows, Python `Path.write_text` writes `CRLF`; TS writes `LF`. Law: **the file is written as `<name>\n` (LF) on every OS, in both runtimes.** Python passes `newline="\n"` to `write_text`; TS is unchanged. The Linux corpus already expects LF, so no corpus payload changes.
 - **Readers stay tolerant.** Both runtimes must read a legacy `CRLF` file, written by an older Python on Windows, and return the same profile name. Python strips it after universal-newline reading; TS uses `pyStrip`, which already removes `\r`. Add a test that pins this in both runtimes.
 - No other text file is in scope. Any other CRLF/LF difference that Codex finds → STOP.
@@ -479,6 +485,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ 7b8a678 (pending Lam's ack):** Node on Windows sets mtimes on a 1.6 µs grid (libuv binary64), so the Windows TS backup uses `CopyFileW` time preservation plus read-back, without `utimes` (§3.7 W1b).
 - **Codex @ b67914f (pending Lam's ack):** the Windows backup-mtime domain is `[0, 2^31 s)` (P19, §3.7 W1); `.last-profile` is always LF and readers accept CRLF (P20, §3.7 W2).
 - **Codex @ 2624e10 (pending Lam's ack):** derived SHA-256 references to the masked-proven `.sqlite3` files may refresh, with a mechanical check (§3.5b).
 - **Codex @ 0d3e00d (pending Lam's ack):** P17 moves the initialization guard inside `BEGIN IMMEDIATE`; checked-in `.sqlite3` fixtures may differ only in header bytes 24–27 and 92–95, enforced by a masked comparison (§3.5b).
