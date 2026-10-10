@@ -178,3 +178,49 @@ test("W1b Windows public migration never calls utimes or futimes", { skip: proce
     store.close();
   }
 });
+
+for (const partial of [true, false]) {
+  test("P2 public migration copy failure with " + (partial ? "partial" : "absent") + " backup", () => {
+    const { root, path, store } = fixture(true);
+    const backup = resolve(root, "backup.sqlite3");
+    const target = resolve(root, "target.sqlite3");
+    const sourceBytes = readFileSync(path);
+    const before = statSync(path, { bigint: true });
+    const inventory = readdirSync(root);
+    const savedCopy = fs.copyFileSync;
+    const copyError = Object.assign(new Error("synthetic copy failure"), { code: "ENOSPC" });
+    let copyCalls = 0;
+    fs.copyFileSync = (source, destination) => {
+      assert.equal(source, path);
+      assert.equal(destination, backup);
+      copyCalls++;
+      if (partial) {
+        fs.writeFileSync(destination, Buffer.from("partial backup"));
+        assert.deepEqual(readFileSync(backup), Buffer.from("partial backup"));
+      }
+      throw copyError;
+    };
+    syncBuiltinESMExports();
+    try {
+      assert.throws(
+        () => store.migrateTo(target, { backupPath: backup }),
+        (error: unknown) =>
+          partial
+            ? error instanceof ValueError && error.message === "backup mtime could not be preserved to a microsecond"
+            : error === copyError,
+      );
+      assert.equal(copyCalls, 1);
+      assert.deepEqual(readdirSync(root), inventory);
+      assert.deepEqual(readFileSync(path), sourceBytes);
+      const after = statSync(path, { bigint: true });
+      assert.equal(after.mtimeNs, before.mtimeNs);
+      assert.equal(after.mode, before.mode);
+      assert.equal(fs.existsSync(backup), false);
+      assert.equal(fs.existsSync(target), false);
+    } finally {
+      fs.copyFileSync = savedCopy;
+      syncBuiltinESMExports();
+      store.close();
+    }
+  });
+}

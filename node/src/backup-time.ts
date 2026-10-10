@@ -13,7 +13,13 @@ export function sourceBackupTime(path: string): bigint {
 }
 
 export function copyBackup(source: string, backup: string, ns: bigint): void {
-  copyFileSync(source, backup);
+  try {
+    copyFileSync(source, backup);
+  } catch (error) {
+    if (!existsSync(backup)) throw error;
+    unlinkSync(backup);
+    throw new ValueError("backup mtime could not be preserved to a microsecond");
+  }
   try {
     hooks.beforeBackupVerify?.();
     // W1b: CopyFileW preserves Windows last-write time. libuv setters lose µs.
