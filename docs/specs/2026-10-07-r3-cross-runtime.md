@@ -374,7 +374,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 ## 5. CI and deliverables
 
 - **CI on all three OSes:** X §2.1, §2.2 and §2.3, plus Z at its fixed budgets.
-- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, or P16 if it is triggered) that comes with its own new cases.
+- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, or P17) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
 - **Local only:** M produces `rehearsal-report.json` (counts and hashes, §4.1). Ty decides whether to share it.
 - **PR shape:** one implementation PR covers X, Z, P15 (and P16 if triggered), the M runner, and `docs/runbooks/r3-rehearsal.md`. CI never runs the rehearsal itself.
 
