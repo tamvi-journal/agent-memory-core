@@ -1,0 +1,42 @@
+name: R3 nightly differential inputs
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRAJECTA_IDENTITY_DATA_DIR: ${{ github.workspace }}/.isolation/data
+  TRAJECTA_IDENTITY_PROFILES: ${{ github.workspace }}/.isolation/profiles
+  TMPDIR: ${{ github.workspace }}/.isolation/tmp
+  TMP: ${{ github.workspace }}/.isolation/tmp
+  TEMP: ${{ github.workspace }}/.isolation/tmp
+
+jobs:
+  differential:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare isolated roots and reports
+        run: python -c "from pathlib import Path; Path('.isolation/tmp').mkdir(parents=True, exist_ok=True); Path('.isolation/r3-reports').mkdir(parents=True, exist_ok=True)"
+      - name: UTC-derived seed and four times every fixed budget
+        run: python tools/r3/fuzz.py --nightly --report .isolation/r3-reports/nightly.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r3-nightly-${{ matrix.os }}
+          path: .isolation/r3-reports
