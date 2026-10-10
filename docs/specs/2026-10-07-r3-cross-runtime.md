@@ -249,6 +249,58 @@ Two overlapping `revise` calls hit the same race on `UNIQUE(revision_number)`. T
 
 **Tests.** The Codex schedules become deterministic regressions in both directions (Python victim / TS holder, and TS victim / Python holder) for `close-loop` and `revise`. Each result must equal one serial order (§2.3), with no `IntegrityError` and no untyped error.
 
+### 3.5c P18: same-key intake race resolves through replay (oracle patch, both runtimes)
+
+**Finding (Codex @ be9f9fc).** The schedule, in both directions:
+1. A passes the prior-key lookup (`governance.py:63`, `governance.ts:193`) and commits G2 unit 1, evidence capture.
+2. B submits the identical key and completes.
+3. A's received-intake INSERT (`governance.py:351`, `governance.ts:218`) then fails on `UNIQUE(memory_intake_v3.idempotency_key)`, and the result surfaces as `RuntimeError: internal error`.
+
+The final store is a valid unit-level serialization (§2.3: the serial unit is the committed sub-transaction), namely A.capture, then all of B. The public result is not: §2.3 forbids an untyped error.
+
+**Law.**
+- The received-intake INSERT is the authoritative idempotency point. The pre-check at the start of `submit` stays as it is; it is the fast path, and G1 is frozen.
+- **Catch scope (Lam B1).** The handler wraps **only** the G2 unit-2 received-intake INSERT transaction. It never wraps `submit()` as a whole, evidence capture, materialization, evidence linking or the decision. `memory_intake_v3` also has NOT NULL, CHECK and FK constraints, and an error from any other unit must surface unchanged.
+- Recovery requires **all** of the following, and it never inspects the message text:
+  1. that INSERT raised a SQLite constraint error;
+  2. its transaction has rolled back;
+  3. a fresh lookup by the same `idempotency_key`, outside that transaction, returns a row;
+  4. that row's `intake_id` equals the deterministic `intake_id` derived from the key.
+
+  If any of these is false, re-raise the **original** constraint error.
+  - A row exists: apply **exactly** the pre-check rule. If `proposal_sha256` is equal, return that row as the replay returns it (it is read now, so it may still be `received`). If it differs, raise `ValueError("idempotency_key already exists with a different proposal")`.
+  - Otherwise (no row, or a different `intake_id`): re-raise. It stays an internal error, and X reports it as a mismatch.
+- **State.** The loser's committed evidence-capture rows stay. That is the frozen G2 unit-1 intermediate, already legal after a kill (§2.2), and it is not cleaned up. The loser commits nothing after it.
+- **Not changed:** the G2 units and their order, the G1 replay behavior, sequential results, and every corpus payload.
+
+**Other sites.** Codex lists every check-then-insert idempotency site in both runtimes: file, function, the lookup, and the insert, for example operation `idempotency_key` and receipts. A site may share P18 **only** if its existing replay law is exactly the following (Lam):
+- a lookup by the same durable key before the insert;
+- a matching stored digest or payload returns the prior stored result or row exactly;
+- a mismatch returns the already-existing deterministic typed refusal;
+- there is no extra authority or state-transition semantics.
+
+If any site differs in any of these, STOP and bring it back for review. Do not generalize from "it also has a UNIQUE constraint".
+
+**Scope ruling (Codex inventory @ be9f9fc, `docs/specs/r3-p18-idempotency-sites.md`).** P18 recovery applies to **intake `submit` only**. For every other inventoried site, the existing replay rule is kept exactly as it is (G1 frozen). No digest comparison or mismatch refusal is added, and receipt integrity still runs before replay:
+- the operations of `create_current`, `revise`, `invalidate` and `apply_maintenance` keep their unconditional replay of the prior operation result;
+- relation add and retract keep `status="duplicate"`;
+- core proposal creation keeps `status="existing"` by `proposal_sha256`;
+- the three receipt consumers keep their order: integrity, purpose, profile and authority checks, then the `_replay_in` / `#replay` mapping, including `ReceiptIntegrityError`;
+- the initialization and migration guards are excluded from P18.
+
+These sites need no recovery because their pre-check and their insert already run inside **one** `BEGIN IMMEDIATE` transaction (the P17 boundary). A same-key loser therefore waits, then sees the committed row on its pre-check and replays it. The race intake has cannot occur at these sites. This must be **proven, not assumed**:
+- For each excluded public site, add one deterministic same-key gate regression in both directions. The winner holds its write transaction after the insert. The loser must block, then return exactly the site's existing replay result, or `StoreBusy` past the busy timeout. It must never return an `IntegrityError`.
+- For each initialization or migration guard whose marker or existence read is **not** already inside the write transaction, P17 applies: move the read inside it. List each guard as "already inside" or "moved".
+- If any site turns out not to hold `BEGIN IMMEDIATE` around both its pre-check and its insert, STOP and report it.
+
+**Tests.** Deterministic gate regressions in both directions (Python loser / TS winner, and the reverse) for:
+- an identical proposal: the loser returns the same bytes a serial replay at that point returns;
+- a different proposal with the same key: the loser raises the typed `ValueError`.
+
+- **the `received` replay case (Lam B2).** The winner commits G2 unit 2, so the intake row is `received`, and pauses **before** materialization and the decision. The loser submits the same key with the same proposal, hits the conflict, rolls back, re-reads, and returns the exact `received` row bytes. Only after that does the winner continue. This proves P18 reuses the frozen pre-check replay and never waits or polls for a terminal status.
+
+For each, the final dump must be equal across directions, doctor must pass, and no `-wal`/`-shm`/`-journal` may remain. Add one X concurrency plan family with shared intake keys, so that the distinct-key passes stop standing in for this schedule.
+
 ### 3.6 Backup mtime resolution (Codex @ bef36ce; amends R2d §3.7 and §5.2)
 
 **Finding.** X found that a TS `migrate-to` backup does not reproduce the source mtime to the nanosecond. Example: a source with `mtime_ns = 1700000000123456789` gave a TS backup of `…122999000`. TS passed millisecond `Date`s to `utimesSync`. Python's `copy2` keeps every nanosecond.
@@ -374,7 +426,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 ## 5. CI and deliverables
 
 - **CI on all three OSes:** X §2.1, §2.2 and §2.3, plus Z at its fixed budgets.
-- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, or P17) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
+- **Corpora:** each reviewed, minimized mismatch is added to the corpus it belongs to. Existing payloads change only through a declared oracle patch (P15, P16 if it is triggered, P17 or P18) that comes with its own new cases, or through the declared generator repair of §3.1b, which is limited to the stderr bytes it names plus MANIFEST provenance.
 - **Local only:** M produces `rehearsal-report.json` (counts and hashes, §4.1). Ty decides whether to share it.
 - **PR shape:** one implementation PR covers X, Z, P15 (and P16 if triggered), the M runner, and `docs/runbooks/r3-rehearsal.md`. CI never runs the rehearsal itself.
 
@@ -398,6 +450,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
+- **Codex @ be9f9fc (Lam: ACK in substance; B1, B2 and the site-scope ruling folded in, pending final ack):** same-key intake race resolves through replay at the INSERT (P18, §3.5c).
 - **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
