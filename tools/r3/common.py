@@ -80,6 +80,45 @@ def expected_for_run(raw: bytes, file: str, oracle_root: Path, actual_root: Path
     return render(encoded, registry, file=file, root=str(actual_root.resolve()), origin="")
 
 
+def adjustment_number_spans(raw: str) -> dict[tuple, tuple[int, int]]:
+    """Locate only adjustment new_value atoms, retaining all other stored bytes."""
+    decoder = json.JSONDecoder()
+    spans = {}
+    def whitespace(index):
+        while index < len(raw) and raw[index] in " \t\r\n": index += 1
+        return index
+    def visit(index, path):
+        index = whitespace(index)
+        if raw[index] == "{":
+            index = whitespace(index + 1)
+            while raw[index] != "}":
+                key, index = decoder.raw_decode(raw, index)
+                index = whitespace(index)
+                assert raw[index] == ":"
+                index = whitespace(visit(index + 1, (*path, key)))
+                if raw[index] != ",": break
+                index = whitespace(index + 1)
+            assert raw[index] == "}"
+            return index + 1
+        if raw[index] == "[":
+            index = whitespace(index + 1)
+            item = 0
+            while raw[index] != "]":
+                index = whitespace(visit(index, (*path, item)))
+                item += 1
+                if raw[index] != ",": break
+                index = whitespace(index + 1)
+            assert raw[index] == "]"
+            return index + 1
+        value, end = decoder.raw_decode(raw, index)
+        if len(path) == 3 and path[0] == "adjustments" and isinstance(path[1], int) and path[2] == "new_value":
+            assert type(value) in (int, float), "decay new_value must remain numeric"
+            spans[path] = (index, end)
+        return end
+    assert whitespace(visit(0, ())) == len(raw)
+    return spans
+
+
 def compare_dumps(expected: dict, actual: dict, *, decay: bool = False) -> None:
     if not decay:
         assert actual == expected, "R0 dump mismatch"
@@ -96,11 +135,19 @@ def compare_dumps(expected: dict, actual: dict, *, decay: bool = False) -> None:
         assert len(wd["adjustments"]) == len(gd["adjustments"])
         for wa, ga in zip(wd["adjustments"], gd["adjustments"]):
             assert wa["record_id"] == ga["record_id"] and wa["field"] == ga["field"] == "accessibility"
+            assert type(wa["new_value"]) is type(ga["new_value"]), "decay numeric kind mismatch"
             assert abs(wa["new_value"] - ga["new_value"]) <= 1e-6
             allowed.add(wa["record_id"])
-            ga["new_value"] = wa["new_value"]
-        assert gd == wd, "decay difference outside new_value whitelist"
-        got["details_json"] = want["details_json"]
+        wanted_spans = adjustment_number_spans(want["details_json"])
+        actual_spans = adjustment_number_spans(got["details_json"])
+        assert wanted_spans.keys() == actual_spans.keys()
+        assert len(wanted_spans) == len(wd["adjustments"])
+        masked = got["details_json"]
+        for path, (start, end) in sorted(actual_spans.items(), key=lambda item: item[1][0], reverse=True):
+            a, b = wanted_spans[path]
+            masked = masked[:start] + want["details_json"][a:b] + masked[end:]
+        assert masked == want["details_json"], "decay difference outside new_value numeric tokens"
+        got["details_json"] = masked
     revisions = {r["revision_id"]: r["record_id"] for r in expected["tables"].get("memory_revisions_v3", [])}
     for want, got in zip(expected["tables"].get("memory_telemetry_v3", []), actual["tables"].get("memory_telemetry_v3", [])):
         if revisions.get(want["revision_id"]) in allowed:

@@ -184,7 +184,8 @@ def rehearse(root, source, profile, cues):
         else:
             tracked, _, _ = pair("retrieve", [cue], sources=sources, cue_index=0 if cues else None)
             decayed, _, _ = pair("decay", sources=tracked)
-            reads(list(reversed(decayed)))
+            for input_copy in decayed:
+                reads([input_copy, input_copy])
         report["result"] = "passed"
         return report
     finally:

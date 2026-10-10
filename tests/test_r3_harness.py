@@ -62,3 +62,37 @@ def test_r3_enumeration_keeps_compound_subtransactions_and_real_time_constraints
     constrained = list(candidate_orders(processes, before={("a-cue", "b-access")}))
     assert constrained == [["a-submit", "a-cue", "b-access", "b-recall"]]
 
+
+@pytest.mark.parametrize("mutation", ["bool-kind", "key-order", "whitespace"])
+def test_decay_whitelist_preserves_every_other_details_byte(mutation):
+    import copy
+    import json
+    from tools.r3.common import compare_dumps
+    source = Path(__file__).resolve().parents[1] / "spec/golden-writes-v5/decay/dump.json"
+    expected = json.loads(source.read_text())
+    actual = copy.deepcopy(expected)
+    op = next(r for r in actual["tables"]["memory_operations_v3"] if r["idempotency_key"].startswith("maintenance:decay:"))
+    details = json.loads(op["details_json"])
+    if mutation == "bool-kind":
+        details["semantic_content_changed"] = 0
+        op["details_json"] = json.dumps(details, ensure_ascii=False)
+    elif mutation == "key-order":
+        op["details_json"] = json.dumps(dict(reversed(list(details.items()))), ensure_ascii=False)
+    else:
+        op["details_json"] = op["details_json"].replace(": ", ":", 1)
+    with pytest.raises(AssertionError): compare_dumps(expected, actual, decay=True)
+
+
+def test_decay_whitelist_accepts_only_the_named_numeric_tokens():
+    import copy
+    import json
+    from tools.r3.common import compare_dumps
+    source = Path(__file__).resolve().parents[1] / "spec/golden-writes-v5/decay/dump.json"
+    expected = json.loads(source.read_text())
+    actual = copy.deepcopy(expected)
+    op = next(r for r in actual["tables"]["memory_operations_v3"] if r["idempotency_key"].startswith("maintenance:decay:"))
+    details = json.loads(op["details_json"])
+    details["adjustments"][0]["new_value"] += 1e-7
+    op["details_json"] = json.dumps(details, ensure_ascii=False)
+    compare_dumps(expected, actual, decay=True)
+
