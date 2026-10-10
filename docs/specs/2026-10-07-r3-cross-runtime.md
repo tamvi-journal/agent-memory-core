@@ -398,7 +398,7 @@ Only the Aux and Lam identity stores are rehearsed, and Ty makes every source co
 - **Lam @ b499ef1:**
   - R1: `decay` is excluded from concurrent plans (G9 stays frozen), and law 4 covers only the transient SQLite sidecars.
   - R2: M branches on the source state (legacy → migrate, ready → compatibility only, otherwise stop). An all-v5 set of sources does not block R4.
-- **Codex @ 6782110 (pending Lam's ack):** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
+- **Codex @ 6782110, settled with Lam @ 8e0ac5c:** usage-error prefix per raising parser; cli-v1 generator repair (§3.1b).
 - **Codex @ df5b755 (settled, #26):**
   - the G2 intake `submit` crash class, with exact intermediates and the Python-retry law (§2.2);
   - P17, sequence allocation inside `BEGIN IMMEDIATE` (§3.5b).
