@@ -21,6 +21,14 @@ import type { MemoryStore, Row } from "./store.ts";
 
 export type Numeric = number | PyInt | PyFloat;
 export type Evidence = Record<string, unknown>;
+// Library parity only: this native constraint failure remains outside P13/MCP's
+// public error set. G1 retries can reach it before a record has materialized.
+class IntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "IntegrityError";
+  }
+}
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 const numberOf = (value: Numeric | undefined, fallback = 0): number =>
   value === undefined
@@ -50,6 +58,22 @@ export function semanticHash(value: Record<string, unknown>): string {
 }
 
 export function insertEvidence(store: MemoryStore, db: DatabaseSync, source: Evidence): string {
+  for (const field of [
+    "evidence_type",
+    "source_ref",
+    "source_family",
+    "independence_group",
+    "captured_at",
+    "actor",
+    "surface",
+    "model_family",
+    "content_summary",
+    "privacy_class",
+    "identity_version",
+  ]) {
+    if (Object.hasOwn(source, field) && typeof source[field] !== "string")
+      throw new ValueError(`evidence.${field} must be a string`);
+  }
   // Python stores evidence.get("source_ref", "") as given (unstripped).
   const sourceRef = String(source.source_ref ?? "");
   const {
@@ -510,11 +534,6 @@ function relation(store: MemoryStore, event: "assert" | "retract", input: Relati
       (latest.source_revision_id ?? null) === (input.sourceRevisionId ?? null)
     )
       return { ...latest, status: "no_op" };
-    if (
-      !row(db, "SELECT 1 AS found FROM memory_records_v3 WHERE record_id=?", input.fromRecordId) ||
-      !row(db, "SELECT 1 AS found FROM memory_records_v3 WHERE record_id=?", input.toRecordId)
-    )
-      throw new ValueError("relation endpoints must exist");
     const stable = String(
         latest?.relation_id ?? input.relationId ?? `${input.fromRecordId}->${type}->${input.toRecordId}`,
       ),
@@ -526,23 +545,28 @@ function relation(store: MemoryStore, event: "assert" | "retract", input: Relati
     if (input.evidence) evidenceId = insertEvidence(store, db, { ...input.evidence, actor, surface });
     const key = input.idempotencyKey ?? `relation:${stable}:${sequence}:${event}`,
       eventId = `relation-event:${sha256(key).slice(0, 32)}`;
-    db.prepare("INSERT INTO memory_relation_events_v4 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
-      eventId,
-      stable,
-      input.fromRecordId,
-      input.toRecordId,
-      type,
-      sequence,
-      event,
-      weight,
-      input.sourceRevisionId ?? null,
-      evidenceId,
-      actor,
-      surface,
-      reason,
-      key,
-      store.now(),
-    );
+    try {
+      db.prepare("INSERT INTO memory_relation_events_v4 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
+        eventId,
+        stable,
+        input.fromRecordId,
+        input.toRecordId,
+        type,
+        sequence,
+        event,
+        weight,
+        input.sourceRevisionId ?? null,
+        evidenceId,
+        actor,
+        surface,
+        reason,
+        key,
+        store.now(),
+      );
+    } catch (error) {
+      if ((error as { errcode?: number }).errcode === 787) throw new IntegrityError((error as Error).message);
+      throw error;
+    }
     return {
       ...row(db, "SELECT * FROM memory_relation_events_v4 WHERE relation_event_id=?", eventId)!,
       status: event === "assert" ? "asserted" : "retracted",

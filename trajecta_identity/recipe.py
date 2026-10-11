@@ -45,7 +45,7 @@ def remember(spec: str, env: dict[str, str] | None = None) -> None:
     path = _last_path(env)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(spec + "\n", encoding="utf-8")
+        path.write_text(spec + "\n", encoding="utf-8", newline="\n")
     except OSError:
         pass  # remembering is a convenience, never a failure
 

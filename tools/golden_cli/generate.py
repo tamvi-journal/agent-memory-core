@@ -17,6 +17,7 @@ import sys
 import tempfile
 import threading
 import unicodedata
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +35,21 @@ BUNDLED = ROOT / "trajecta_identity/profiles"
 
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
+
+
+def usage_prefix(stderr: bytes) -> bytes:
+    """R3 §3.1b: observe the raising parser, independently validate its prog."""
+    from trajecta_identity.cli import parser
+    root = parser()
+    progs = {root.prog}
+    for action in root._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            progs.update(command.prog for command in action.choices.values())
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    assert lines, "usage error has no stderr line"
+    prog, marker, _ = lines[-1].partition(b": error:")
+    assert marker and prog.decode("utf-8") in progs, "unknown raising parser prog"
+    return prog + marker
 
 
 def write_json(path, value):
@@ -95,7 +111,7 @@ def isolated_env(work, clock):
 
 def schema_record(path):
     # immutable avoids journal handling while inspecting the oracle fixture.
-    with sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True) as db:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
         return {"application_id": db.execute("PRAGMA application_id").fetchone()[0],
                 "user_version": db.execute("PRAGMA user_version").fetchone()[0],
                 "sqlite_master": [list(row) for row in db.execute(
@@ -171,7 +187,7 @@ COMMANDS = {"init": [], "setup": [], "profiles": [], "work": [], "status": [],
 
 
 def scenario_matrix():
-    scenarios = []
+    scenarios = [{"name": "p16-store-busy", "state": "ready", "argv": ["--db", "store.sqlite3", "log-phase", "blocked", "--title", "Blocked", "--summary", "Blocked"]}]
     for command, args in COMMANDS.items():
         for state in ("missing", "uninitialized", "legacy-v4", "ready"):
             scenarios.append({"name": f"{command}-{state}", "state": state, "argv": ["--db", "store.sqlite3", command, *args]})
@@ -394,7 +410,18 @@ def generate(output):
             old_cwd = Path.cwd()
             try:
                 os.chdir(work); validate_paths(live_argv, env, work)
-                process = subprocess.run([sys.executable, "-m", "trajecta_identity.cli", *live_argv], cwd=work, env=env, input=stdin, capture_output=True)
+                from contextlib import nullcontext
+                from tools.r3.busy import held_writer
+                busy = name == "p16-store-busy"
+                with held_writer("py", work / "store.sqlite3", env) if busy else nullcontext():
+                    before_busy = (work / "store.sqlite3").read_bytes() if busy else None
+                    import time
+                    start = time.monotonic()
+                    process = subprocess.run([sys.executable, "-m", "trajecta_identity.cli", *live_argv], cwd=work, env=env, input=stdin, capture_output=True)
+                    if busy:
+                        assert time.monotonic() - start >= 4.5
+                        assert process.returncode == 1 and process.stderr == b"StoreBusy: store is busy; retry later\n"
+                        assert (work / "store.sqlite3").read_bytes() == before_busy
             finally:
                 os.chdir(old_cwd)
                 if server:
@@ -404,7 +431,7 @@ def generate(output):
             for file, raw in (("stdout", process.stdout), ("stderr", process.stderr)):
                 if mode in {"help", "usage", "crash"} and (file == "stderr" or mode == "help"):
                     # Prose/tracebacks are explicitly not frozen (§3.1/A13).
-                    raw = b"trajecta-identity: error:" if mode == "usage" else b"nonempty" if mode == "crash" else b""
+                    raw = usage_prefix(process.stderr) if mode == "usage" else b"nonempty" if mode == "crash" else b""
                 if config.get("argv", [None])[-1:] == ["setup"] or "setup" in argv:
                     if file == "stdout" and process.returncode == 0:
                         data = json.loads(raw)

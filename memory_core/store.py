@@ -6,6 +6,7 @@ import re
 import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -39,6 +40,22 @@ class IncompatibleJournalMode(SchemaVersionError):
 
 class PinnedRecordError(ValueError):
     """A public identity writer attempted to mutate a structural record."""
+
+
+class StoreBusy(RuntimeError):
+    def __init__(self):
+        super().__init__("store is busy; retry later")
+
+
+def _translate_sqlite_error(error: sqlite3.Error) -> Exception:
+    code = getattr(error, "sqlite_errorcode", None)
+    if hasattr(error, "sqlite_errorcode"):
+        busy = isinstance(code, int) and (code & 0xff) in {5, 6}
+    else:
+        busy = isinstance(error, sqlite3.OperationalError) and str(error) in {
+            "database is locked", "database table is locked", "database schema is locked",
+        }
+    return StoreBusy() if busy else error
 
 
 def utc_now() -> str:
@@ -204,15 +221,28 @@ class MemoryStore:
 
     @contextmanager
     def _raw_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
+        # Includes open, statements in the caller, and context-manager COMMIT.
+        # The inner connection rolls back before this public translation.
+        try:
+            with self._sqlite_connect(readonly=readonly) as conn:
+                yield conn
+        except sqlite3.Error as exc:
+            translated = _translate_sqlite_error(exc)
+            if translated is exc:
+                raise
+            raise translated from exc
+
+    @contextmanager
+    def _sqlite_connect(self, *, readonly: bool = False) -> Iterator[sqlite3.Connection]:
         repair = "Repair with: sqlite3 <store.sqlite3> 'PRAGMA journal_mode=DELETE;'"
         resolved = self.db_path.resolve()
         self._preflight(readonly=readonly)
         if readonly:
             uri = f"{resolved.as_uri()}?mode=ro"
-            conn = sqlite3.connect(uri, uri=True)
+            conn = sqlite3.connect(uri, uri=True, timeout=5.0)
         else:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA foreign_keys=ON")
@@ -232,6 +262,9 @@ class MemoryStore:
                 try:
                     mode = str(conn.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower()
                 except sqlite3.Error as exc:
+                    translated = _translate_sqlite_error(exc)
+                    if translated is not exc:
+                        raise translated from exc
                     raise IncompatibleJournalMode(
                         f"SQLite refused journal_mode=DELETE. {repair}"
                     ) from exc
@@ -269,14 +302,16 @@ class MemoryStore:
                 "state": "uninitialized",
             }
         with self._raw_connect(readonly=True) as conn:
-            application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
-            user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-            tables = {
-                row["name"]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
-            }
+            return self._schema_info_in(conn)
+
+    @staticmethod
+    def _schema_info_in(conn: sqlite3.Connection) -> dict[str, Any]:
+        application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        tables = {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
         if application_id == APPLICATION_ID and user_version == SCHEMA_VERSION:
             state = "ready"
         elif user_version > SCHEMA_VERSION or (
@@ -307,45 +342,39 @@ class MemoryStore:
         remains for existing consumers, but it is only used on write paths.
         """
 
-        # initialize is a writable open, so reconcile a persisted WAL header
-        # before schema_info performs its fail-closed read.
-        with self._raw_connect():
-            pass
-        before = self.schema_info()
-        if before["state"] == "ready":
-            return {**before, "changed": False}
-        if before["state"] == "incompatible":
-            raise SchemaVersionError(
-                "database application_id/user_version is newer or foreign"
-            )
-        if before["state"] == "legacy-v4":
-            raise MigrationRequiredError(
-                "schema v4 store must be migrated to v5 before writing"
-            )
-        if before["state"] in {"legacy-v2", "legacy-v3"} and not migrate:
-            raise MigrationRequiredError(
-                f"{before['state']} store requires migration"
-            )
-
         schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+        existed = self.db_path.exists()
         with self._raw_connect() as conn:
-            application_id = int(conn.execute("PRAGMA application_id").fetchone()[0])
-            user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-            if user_version > SCHEMA_VERSION:
+            conn.execute("BEGIN IMMEDIATE")
+            before = self._schema_info_in(conn)
+            if not existed and before["state"] == "unknown":
+                before["state"] = "uninitialized"
+            if before["state"] == "ready":
+                return {**before, "changed": False}
+            if before["state"] == "incompatible":
                 raise SchemaVersionError(
-                    f"database user_version {user_version} exceeds {SCHEMA_VERSION}"
+                    "database application_id/user_version is newer or foreign"
                 )
-            if application_id not in {0, APPLICATION_ID}:
-                raise SchemaVersionError(
-                    f"foreign application_id {application_id}; expected {APPLICATION_ID}"
+            if before["state"] == "legacy-v4":
+                raise MigrationRequiredError(
+                    "schema v4 store must be migrated to v5 before writing"
                 )
+            if before["state"] in {"legacy-v2", "legacy-v3"} and not migrate:
+                raise MigrationRequiredError(f"{before['state']} store requires migration")
             tables = {
                 row["name"]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
-            conn.executescript(schema)
+            # executescript commits a pending transaction. Execute complete
+            # statements individually to retain the guard's immediate lock.
+            statement = ""
+            for line in schema.splitlines(keepends=True):
+                statement += line
+                if sqlite3.complete_statement(statement):
+                    conn.execute(statement)
+                    statement = ""
+            if statement.strip():
+                raise RuntimeError("incomplete schema SQL")
             if "memory_records_v2" in tables:
                 self._migrate_v2(conn)
             self._backfill_relation_events(conn)
@@ -442,8 +471,22 @@ class MemoryStore:
             raise ValueError("backup path must differ from target")
         if backup.exists():
             raise FileExistsError(backup)
+        source_mtime_ns = self.db_path.stat().st_mtime_ns
+        backup_upper_ns = (1 << (31 if sys.platform == "win32" else 32)) * 10**9
+        if not 0 <= source_mtime_ns < backup_upper_ns:
+            raise ValueError("source mtime is outside the supported backup range")
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.db_path, backup)
+        copied = False
+        try:
+            shutil.copy2(self.db_path, backup)
+            copied = True
+            if backup.stat().st_mtime_ns // 1000 != source_mtime_ns // 1000:
+                raise ValueError("backup mtime could not be preserved to a microsecond")
+        except (OSError, ValueError) as exc:
+            if not copied and not backup.exists():
+                raise
+            backup.unlink(missing_ok=True)
+            raise ValueError("backup mtime could not be preserved to a microsecond") from exc
         # Outside cleanup: target may alias the durable backup through its parent.
         if target.exists():
             raise FileExistsError(target)
@@ -580,6 +623,7 @@ class MemoryStore:
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -687,6 +731,7 @@ class MemoryStore:
             )
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -795,6 +840,7 @@ class MemoryStore:
         self._guard_pinned(record_id)
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, idempotency_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -1137,6 +1183,7 @@ class MemoryStore:
             raise ValueError("relation weight must be between 0 and 10")
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             if idempotency_key:
                 prior = conn.execute(
                     "SELECT * FROM memory_relation_events_v4 "
@@ -1292,6 +1339,7 @@ class MemoryStore:
             raise ValueError("access gain must be between 0 and 1")
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             owner = conn.execute(
                 "SELECT record_id FROM memory_revisions_v3 WHERE revision_id=?",
                 (revision_id,),
@@ -1341,6 +1389,7 @@ class MemoryStore:
         operation_key = idempotency_key or f"maintenance:{run_id}"
         self.initialize()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             prior = self._operation_by_key(conn, operation_key)
             if prior:
                 return self._operation_result(conn, prior)
@@ -1489,6 +1538,13 @@ class MemoryStore:
     def _insert_evidence(
         conn: sqlite3.Connection, evidence: dict[str, Any]
     ) -> str:
+        for field in (
+            "evidence_type", "source_ref", "source_family", "independence_group",
+            "captured_at", "actor", "surface", "model_family", "content_summary",
+            "privacy_class", "identity_version",
+        ):
+            if field in evidence and not isinstance(evidence[field], str):
+                raise ValueError(f"evidence.{field} must be a string")
         identity = canonical_evidence_identity(evidence)
         evidence_id = (
             f"evidence:{identity['identity_version']}:"

@@ -20,7 +20,21 @@ import { spawn, spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
-import { parseArgs, cliJson, confirmationLine, utf8Replace, errorName } from "../src/cli-runtime.ts";
+import { parseArgs, CliExit, cliJson, confirmationLine, utf8Replace, errorName } from "../src/cli-runtime.ts";
+
+for (const [label, argv, prog] of [
+  ["root unknown command", ["unknown-r3"], "trajecta-identity"],
+  ["root leftover argument", ["status", "leftover"], "trajecta-identity"],
+  ["command typed option", ["timeline", "--limit", "1.0"], "trajecta-identity timeline"],
+  ["command missing positional", ["retrieve"], "trajecta-identity retrieve"],
+  ["command exclusive group", ["approve-core", "proposal", "--apply", "--reject"], "trajecta-identity approve-core"],
+] as const)
+  test(`R3 raising parser: ${label}`, () => {
+    assert.throws(
+      () => parseArgs([...argv]),
+      (error: unknown) => error instanceof CliExit && error.status === 2 && error.message.startsWith(`${prog}: error:`),
+    );
+  });
 import { main } from "../src/cli.ts";
 import { parseIntToken, isAlnum } from "../src/cli-tables.ts";
 import { dataDir, safeFsName, resolvedPath } from "../src/paths.ts";

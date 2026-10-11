@@ -198,47 +198,62 @@ export class ValidatedIntake {
     }
     this.validate(p);
     const [status, reason] = this.evaluate(p);
+    // Python dict.setdefault supplies only absent keys; present nulls reach P15.
+    const withDefaults = (item: Evidence): Evidence => {
+      const evidence = { ...item };
+      const defaults = {
+        actor: p.actor,
+        surface: this.surface,
+        model_family: p.model_family,
+        privacy_class: "private",
+      };
+      for (const [key, value] of Object.entries(defaults)) if (!Object.hasOwn(evidence, key)) evidence[key] = value;
+      return evidence;
+    };
     const evidenceIds = this.store.transaction((db) =>
-      p.evidence.map((item: Evidence) =>
-        insertEvidence(this.store, db, {
-          ...item,
-          actor: item.actor ?? p.actor,
-          surface: item.surface ?? this.surface,
-          model_family: item.model_family ?? p.model_family,
-          privacy_class: item.privacy_class ?? "private",
-        }),
-      ),
+      p.evidence.map((item: Evidence) => insertEvidence(this.store, db, withDefaults(item))),
     );
     const intakeId = `intake:${sha256(p.idempotency_key).slice(0, 32)}`,
       target = p.operation_type === "create" ? null : p.record_id;
-    this.store.transaction((db) =>
-      db
-        .prepare(
-          "INSERT INTO memory_intake_v3(intake_id,operation_type,target_record_id,proposal_sha256,evidence_ids_json,status,decision_reason,operation_id,actor,surface,idempotency_key,created_at,decided_at) VALUES(?,?,?,?,?,'received','',NULL,?,?,?,?,NULL)",
-        )
-        .run(
-          intakeId,
-          p.operation_type,
-          target,
-          proposalSha,
-          pyJsonDumps(evidenceIds),
-          p.actor,
-          this.surface,
-          p.idempotency_key,
-          this.store.now(),
-        ),
-    );
+    try {
+      this.store.transaction((db) =>
+        db
+          .prepare(
+            "INSERT INTO memory_intake_v3(intake_id,operation_type,target_record_id,proposal_sha256,evidence_ids_json,status,decision_reason,operation_id,actor,surface,idempotency_key,created_at,decided_at) VALUES(?,?,?,?,?,'received','',NULL,?,?,?,?,NULL)",
+          )
+          .run(
+            intakeId,
+            p.operation_type,
+            target,
+            proposalSha,
+            pyJsonDumps(evidenceIds),
+            p.actor,
+            this.surface,
+            p.idempotency_key,
+            this.store.now(),
+          ),
+      );
+    } catch (error) {
+      // transaction() has rolled back and closed. Only unit-2 constraints qualify.
+      const code = (error as { errcode?: unknown } | null)?.errcode;
+      if (typeof code !== "number" || (code & 0xff) !== 19) throw error;
+      let prior: Record<string, unknown> | undefined;
+      try {
+        prior = this.store.all("SELECT * FROM memory_intake_v3 WHERE idempotency_key=?", p.idempotency_key)[0];
+      } catch {
+        // A failed fresh read cannot establish P18's recovery proof.
+        throw error;
+      }
+      if (!prior || prior.intake_id !== intakeId) throw error;
+      if (prior.proposal_sha256 !== proposalSha)
+        throw new ValueError("idempotency_key already exists with a different proposal");
+      return this.intake(String(p.idempotency_key));
+    }
     if (["held", "rejected", "no_op"].includes(status)) {
       this.decide(intakeId, status, reason, target, null);
       return this.intake(p.idempotency_key);
     }
-    const primary = {
-      ...p.evidence[0],
-      actor: p.evidence[0].actor ?? p.actor,
-      surface: p.evidence[0].surface ?? this.surface,
-      model_family: p.evidence[0].model_family ?? p.model_family,
-      privacy_class: p.evidence[0].privacy_class ?? "private",
-    };
+    const primary = withDefaults(p.evidence[0]);
     let result: Record<string, unknown>;
     const key = `intake:${p.idempotency_key}`;
     if (p.operation_type === "create")

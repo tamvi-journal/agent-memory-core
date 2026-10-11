@@ -11,6 +11,85 @@ env:
   TRAJECTA_IDENTITY_PROFILES: ${{ github.workspace }}/.isolation/identity-profiles
 
 jobs:
+  r3-cross-runtime:
+    name: ${{ matrix.os }} / R3 X and synthetic M
+    runs-on: ${{ matrix.os }}
+    # Windows reached 15m after the fixed matrix and crashes, during mandatory concurrency.
+    # Extend only the runner failure bound; every plan, seed and serial proof remains required.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      TMPDIR: ${{ github.workspace }}/.isolation/tmp
+      TMP: ${{ github.workspace }}/.isolation/tmp
+      TEMP: ${{ github.workspace }}/.isolation/tmp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare isolated roots and reports
+        run: python -c "from pathlib import Path; Path('.isolation/tmp').mkdir(parents=True, exist_ok=True); Path('.isolation/r3-reports').mkdir(parents=True, exist_ok=True)"
+      - name: Install test helpers
+        run: python -m pip install -e ".[test]"
+      - name: Windows P19 and P20 end-to-end merge gate
+        if: runner.os == 'Windows'
+        run: python -W error::ResourceWarning -m pytest -vv -s tests/test_r3_backup_time.py tests/test_r3_windows_law.py
+      - name: Focused laws and synthetic rehearsal only
+        run: python -W error::ResourceWarning -m pytest -q tests/test_r3_fixture_headers.py tests/test_r3_idempotency.py tests/test_r3_allocation.py tests/test_r3_backup_time.py tests/test_r3_windows_law.py tests/test_r3_busy.py tests/test_r3_evidence.py tests/test_r3_g2.py tests/test_r3_harness.py tests/test_r3_fuzz.py tests/test_r3_usage.py tests/test_r3_rehearsal.py
+      - name: X fixed matrix and all 200 seeds
+        run: python tools/r3/run.py > .isolation/r3-reports/sequential.jsonl
+      # Synthetic filesystem values retained only when a Windows law fails.
+      - name: Diagnose Windows filesystem parity
+        if: failure() && runner.os == 'Windows'
+        run: python tools/r3/backup_probe.py > .isolation/r3-reports/backup-probe.jsonl
+      - name: X real process kills and opposite-runtime retries
+        run: python tools/r3/crashes.py > .isolation/r3-reports/crashes.json
+      - name: X concurrent serializability proofs
+        run: python tools/r3/concurrency.py > .isolation/r3-reports/concurrency.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r3-x-${{ matrix.os }}
+          path: .isolation/r3-reports
+
+  r3-differential:
+    name: ${{ matrix.os }} / R3 Z 2000 MCP 2000 CLI 5000 kernel
+    runs-on: ${{ matrix.os }}
+    # Windows exhausted the former wall-clock bound before finishing its fixed budgets.
+    # Every case remains mandatory; this is only the job's failure timeout (§3.2).
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      TMPDIR: ${{ github.workspace }}/.isolation/tmp
+      TMP: ${{ github.workspace }}/.isolation/tmp
+      TEMP: ${{ github.workspace }}/.isolation/tmp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare isolated roots and reports
+        run: python -c "from pathlib import Path; Path('.isolation/tmp').mkdir(parents=True, exist_ok=True); Path('.isolation/r3-reports').mkdir(parents=True, exist_ok=True)"
+      - name: Every fixed-budget case and transport smokes
+        run: python tools/r3/fuzz.py --report .isolation/r3-reports/z.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r3-z-${{ matrix.os }}
+          path: .isolation/r3-reports
+
   node-conformance:
     name: ${{ matrix.os }} / node22 / read and write conformance
     runs-on: ${{ matrix.os }}
@@ -40,6 +119,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install
         run: python -m pip install -e ".[test]"
       - name: Test

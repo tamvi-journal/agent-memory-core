@@ -1,0 +1,2244 @@
+{
+  "schema": "trajecta.r3-init-fixture-proof/v1",
+  "before_commit": "2624e10a40250bb8251193c6ba15f59c967656a7",
+  "settled_header": "1444390",
+  "settled_hashes": "94ee892",
+  "python": "3.11.15",
+  "sqlite": "3.40.1",
+  "unicode": "14.0.0",
+  "hashseeds": [
+    0,
+    1,
+    4294967295
+  ],
+  "masked_offsets": [
+    24,
+    25,
+    26,
+    27,
+    92,
+    93,
+    94,
+    95
+  ],
+  "changed_sqlite_files": 129,
+  "changed_hash_fields": 101,
+  "proof": [
+    {
+      "file": "golden-writes-v5/bootstrap/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "02d9e6270816e9637b2ef3d8be03ef410fc90a0cae93ad0e49e1a9c9f511b8c5",
+      "new_sha256": "ff5d950fb534b8d2da00c4198b402de76d32067ab1cbfc06ca2c3a410d545bd6",
+      "masked_sha256": "6ae588058b41ec6f6bb3447fa0db00a7f5f9c94516ab4ba3473a56ed12730e21"
+    },
+    {
+      "file": "golden-writes-v5/decay-boundary/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "a6a4474f87503cdea99c66f51e0c2e7a1370ae8d7ab9f28a5eeaa141d30db0c2",
+      "new_sha256": "35315faf9a2e205680bce66bd7fdf3de956d75fdc2087303801aea36a3c5a302",
+      "masked_sha256": "a58f5f96d38c73414e22b6707ce5a02e3462110e5ebe1a574b28c0355889c14c"
+    },
+    {
+      "file": "golden-writes-v5/decay-half/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "21f1cecc0d6f325215f6a1afb11be4e24df0ea928ed6fef8ffe5deb36f79c580",
+      "new_sha256": "73be76b3894baa7ecf79b42111e5272c1db5fc9e0a26e9ec2f4273671323c46c",
+      "masked_sha256": "027741b0285059ac9331d456d0658a575f9998a70bb1cc46b05c943caa2e1fac"
+    },
+    {
+      "file": "golden-writes-v5/decay/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "ecb0508beb3868faab2a83ce56022eec903a1099deb69ab0281a2a59f60c3a2f",
+      "new_sha256": "31b50dbd10e40093c84fbe2d635826af097d0c91d4fd266b209057173765f1d9",
+      "masked_sha256": "029578fee87d1371c1e042c125f167b0608e21a8a54cc06a6967999974804eaf"
+    },
+    {
+      "file": "golden-writes-v5/evidence-intake-defaults-p15/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "d201bd187beda2a2e43e44107c4cedf478624739bf039081daf9279c2264e684",
+      "new_sha256": "4c19a0976c0199daf7724bcb356c018e91c6d2a8d41ea585fd97d34ef2ff3783",
+      "masked_sha256": "d222026a5bea4028c7649ba292a882572fc6a6db7d25bb0c60395b4f810bf970"
+    },
+    {
+      "file": "golden-writes-v5/evidence-metadata-p15/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "d201bd187beda2a2e43e44107c4cedf478624739bf039081daf9279c2264e684",
+      "new_sha256": "4c19a0976c0199daf7724bcb356c018e91c6d2a8d41ea585fd97d34ef2ff3783",
+      "masked_sha256": "d222026a5bea4028c7649ba292a882572fc6a6db7d25bb0c60395b4f810bf970"
+    },
+    {
+      "file": "golden-writes-v5/evidence-replay-p15/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "b10f0b143910d390041522692a7389cca1ee6d50771ddb4b54cf3180b5b2359f",
+      "new_sha256": "3937b134dca154847d65004ac1d9dd8db4fbfc32e836cae1f23037aa9badb94f",
+      "masked_sha256": "e858bc32720ff9a34cbab0bae5df249bb12d956d1f2abbd07abb464d1d08d408"
+    },
+    {
+      "file": "golden-writes-v5/fact-loop/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "dd62f7b10fffa6d211c15d4f76a2c8b8efbe86075979acb326787243bd487f81",
+      "new_sha256": "f2e54ee05a23d1f72392b87223ae6a2afb38f18ca3359652a5d9f041a1b00784",
+      "masked_sha256": "a39eb9b6f5c910a1167f66b7d15a54a4b9716882fd83d8a3330b4d642c9d43be"
+    },
+    {
+      "file": "golden-writes-v5/intake/store.sqlite3",
+      "size": 266240,
+      "old_sha256": "9d6b583f5a66d3b721bdb59a98aabe217e052726981483ab3acf2ef9580d3c28",
+      "new_sha256": "0bb5955797fc05eb45a116e89e461afd6cc71aa263daa983d6f015a39db5d80c",
+      "masked_sha256": "a6f6e63bfca6d6cd961847b35e53c72997b3779cb81b532dfa35ae78a1fa5891"
+    },
+    {
+      "file": "golden-writes-v5/kernel/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "e749ea9800a25795846b7131f987af2f8a224678081cd23ca720e73fd2ecd477",
+      "new_sha256": "473a285286b9d79f0a1db5f6bec337d645aa495be2581a2cef2b841fb83118c4",
+      "masked_sha256": "1203dc59cd7477688c995c34d9feba724ae48ec52e396873185b97367b6afc0d"
+    },
+    {
+      "file": "golden-writes-v5/migration-v2/store.sqlite3",
+      "size": 278528,
+      "old_sha256": "99d2d797a22b4ceadef9f39250c3603119a6e275061dda12ab344058be3fbfdd",
+      "new_sha256": "44af75b417da7bc9cdc128ef30dab42584359ff8609dd64ba18ba38a11b3d0c3",
+      "masked_sha256": "8f70119c2f2da308fd2cb943e7be9a4941ea3207e8b1f72003ecda0bc5b44e68"
+    },
+    {
+      "file": "golden-writes-v5/migration-v3/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "9663a9d8bbd1a3a308b064cf3ebdac67cb6aaf179d27c75853bce29b10b5d26a",
+      "new_sha256": "accfb34648f71f260421dc51562521a48e4911b96e49752313cd740d63d6a475",
+      "masked_sha256": "e0f58ac8dcb9f580ee0e9644e71b791f27d889eece64c2df34f696370f5f8698"
+    },
+    {
+      "file": "golden-writes-v5/phase/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "6de7bdb1b19bde3910f9b515e3aecf8c33c890fd6f4c70f6f8e8d94fddd9f0f6",
+      "new_sha256": "0f75558b8d0530eb21fd478969aa5d7655e93268c7b72656d259c20e4f8fba56",
+      "masked_sha256": "e77238583fb3ab346ff4e1aeaad02d01ad68c4f24ed5f7833d79302989b93335"
+    },
+    {
+      "file": "golden-writes-v5/recall/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "9864011c718f67b2f9bb9cc1bbfaf9829507ee713d25411a121ed8366fb40cbe",
+      "new_sha256": "344c231e5868419a384c2786968f28350824b613af3077aac19a9bef036ad621",
+      "masked_sha256": "5a06c5e9e4d461920c969ae4bc7f1ae1f22d3286600c0d2f75bfa1f55e3f99c4"
+    },
+    {
+      "file": "golden-writes-v5/relation-missing-endpoint-r3/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "d201bd187beda2a2e43e44107c4cedf478624739bf039081daf9279c2264e684",
+      "new_sha256": "4c19a0976c0199daf7724bcb356c018e91c6d2a8d41ea585fd97d34ef2ff3783",
+      "masked_sha256": "d222026a5bea4028c7649ba292a882572fc6a6db7d25bb0c60395b4f810bf970"
+    },
+    {
+      "file": "golden-writes-v5/work-no-root/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "5f41b666fff4f45b7b3ed339e7f297dfba0f7cd0330c7d9bd6f878c8e0a90b31",
+      "new_sha256": "8294e01dfee9ca410e97bc0efd4d03959638acb917b2b16d9d337abb91e7856c",
+      "masked_sha256": "b340c785c6db70b56ef4aaad61234ce7f319b92b4f07702f1e92d7fffe23d211"
+    },
+    {
+      "file": "golden-writes-v5/work-refs/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "43e969bf6eb5b9c7c5063581875b23a2f9f41ed85782cab0d097dc1976c6f0de",
+      "new_sha256": "3131b50e4b952180481b29ba8d9f3303730fe4e8480f0ed53805cb7a60bd89a7",
+      "masked_sha256": "484b8074b3939d5da4b650ed5f23e46d5847fba13873998c35c1ccf22549a263"
+    },
+    {
+      "file": "golden-writes-v5/work-wrong-schema/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "02d9e6270816e9637b2ef3d8be03ef410fc90a0cae93ad0e49e1a9c9f511b8c5",
+      "new_sha256": "ff5d950fb534b8d2da00c4198b402de76d32067ab1cbfc06ca2c3a410d545bd6",
+      "masked_sha256": "6ae588058b41ec6f6bb3447fa0db00a7f5f9c94516ab4ba3473a56ed12730e21"
+    },
+    {
+      "file": "golden-authority-v2/apply-replay/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "d67642eea7144f1a8f7e16eef89a2969aa3184ca212c9c7014851bd2fdccfb27",
+      "new_sha256": "7152846e71609360910145712328c2340d154796c86e251d6c66ffbd3a470e31",
+      "masked_sha256": "692e069d4e5a076413a09c0d9207addc67df24af377bd693fcad6d2bafb7250b"
+    },
+    {
+      "file": "golden-authority-v2/binding-idempotent/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "c9ce5029ff32d8de0f30b628cbbb43cf7dfd5369a08f25f1857e92777aaa1719",
+      "new_sha256": "754a336a5b6eb3d86a0ca1e37cd556cb33e08e18c7be3b32cbd4bcb495ae0143",
+      "masked_sha256": "a554d84b1f87ec91da0c0e9b34b6c875663a48c1b18e0f168f0289f9c83d3aab"
+    },
+    {
+      "file": "golden-authority-v2/decision-note-race/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "dcfaf1dad01b476498d099f0fe788580781d7149fa28da561361808895ce9c77",
+      "new_sha256": "c06d4ed44f7b1a2b3c6363546da3b92d6ab1ba25f4f1ee8565caba74e1bfb7d7",
+      "masked_sha256": "1aae6a380b23980b97e66d59c4b9515f820ea05f716a68933dbd74dc7a857090"
+    },
+    {
+      "file": "golden-authority-v2/default-source-ref/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "a958908e6a451cc6966ea2108e2d4b3d2ef64d6fe6906b0244c06a7c40f855f0",
+      "new_sha256": "b12995439f83900962f43b8ffb7f6fb4d1c601c3a5bb109188c2de2c6d104d87",
+      "masked_sha256": "826e5d9b928d948475124e247f5a088b8d62e3fb9f4244b6eb57d4e25f10252d"
+    },
+    {
+      "file": "golden-authority-v2/encoding/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "520a6138e60fc60897edfc46761bc6f4322a04816351eb7045a412f7fbfd1bd7",
+      "new_sha256": "2f998b6ee5b67f59199415ce7e1a60b719deb2a503e112945945ab17b7595d60",
+      "masked_sha256": "57c11229e5b76424034054e8ee329923e0d20fb3e59058b61ff4399eb69685de"
+    },
+    {
+      "file": "golden-authority-v2/issue-only/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "d67642eea7144f1a8f7e16eef89a2969aa3184ca212c9c7014851bd2fdccfb27",
+      "new_sha256": "7152846e71609360910145712328c2340d154796c86e251d6c66ffbd3a470e31",
+      "masked_sha256": "692e069d4e5a076413a09c0d9207addc67df24af377bd693fcad6d2bafb7250b"
+    },
+    {
+      "file": "golden-authority-v2/negative-crash-rollback/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "c9ce5029ff32d8de0f30b628cbbb43cf7dfd5369a08f25f1857e92777aaa1719",
+      "new_sha256": "754a336a5b6eb3d86a0ca1e37cd556cb33e08e18c7be3b32cbd4bcb495ae0143",
+      "masked_sha256": "a554d84b1f87ec91da0c0e9b34b6c875663a48c1b18e0f168f0289f9c83d3aab"
+    },
+    {
+      "file": "golden-authority-v2/negative-guard-confirmation/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "7750277701a9d9a3b3ab75db5fc164c44053c202a7fb923defe20a8e05819b4d",
+      "new_sha256": "e6098059a49790efe779afa517efbd9810b12a66d627d11f66c8c09f3d877839",
+      "masked_sha256": "c5e932fa9cbb25c30e4908aecf1bf8450be7d86de40edf9068c722a7ac8e57cc"
+    },
+    {
+      "file": "golden-authority-v2/negative-guard-no-tty/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "7750277701a9d9a3b3ab75db5fc164c44053c202a7fb923defe20a8e05819b4d",
+      "new_sha256": "e6098059a49790efe779afa517efbd9810b12a66d627d11f66c8c09f3d877839",
+      "masked_sha256": "c5e932fa9cbb25c30e4908aecf1bf8450be7d86de40edf9068c722a7ac8e57cc"
+    },
+    {
+      "file": "golden-authority-v2/negative-proposal-content/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "f777fe2e5e4360e01a0326757f7c42fbb70aab8b94f452584b0ad143b3ed5591",
+      "new_sha256": "4ba875ba2b7c968e14417ddd4af66ea89acb5fa685047311239b415da9471a36",
+      "masked_sha256": "6d0b65611e24492fd78f8230e235099c26abf95fd2150849780fdb23e5a75cc6"
+    },
+    {
+      "file": "golden-authority-v2/negative-proposal-phase-content/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "1cd6d228369af2570f8be3059b237b2a45ae05c7a9668e494c56a7231bae2534",
+      "new_sha256": "ea0e91c43a7b1213e87795fbd1f7cb74b56981f4c4c3ba66aebc536ffd5ac1a0",
+      "masked_sha256": "b2e428562f9cc79970c159c19e708ccc2136eef0a0ebfb5718772d5d9002c58b"
+    },
+    {
+      "file": "golden-authority-v2/negative-proposal-phase-json/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "81ec54540af9771f4262d58750adc583e39152938f52149d6e8ce6dc5689bd07",
+      "new_sha256": "c9e91a71e71eea042df826c744f769e234347c20c675df98dff39dc70fa55299",
+      "masked_sha256": "5b23b202c54cc97373927fdc8705ff82ed71164ecc95ef908296e20f3bf62d83"
+    },
+    {
+      "file": "golden-authority-v2/negative-proposal-source-ref/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "4fb36ee901055b5a1d7809cebdaa515dfa68a7dd769eec977f0354a023c3b2e3",
+      "new_sha256": "f2785682eb7b1eb9cbbe129af3fee6f262376b4c0b1047121623d8fa0d95b443",
+      "masked_sha256": "8bc57c767d25091a369899a388b878b7877ef54d1f3f2538986475825052c2bc"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-binding-json/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "ebe822e516a89dc3f5e8d6b4c90aa45b335686f4dfe8c43d30f81af574f9cfbe",
+      "new_sha256": "40880e5081d83465563afcbd02f7bfb458039d52967244f72a0607f1f39b952d",
+      "masked_sha256": "27ad2d72efc0e7a7c830670b825bb30c5ec1345d6f6ca0e96f1f1b7fb5acae34"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-binding-sha/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "8184f05e2151e84909406312ca459173410dc58c2cf507610f3d8fd1a38eea4f",
+      "new_sha256": "c74bbf2444e7dc3630d81ffed22b99bd538f0621ff9ae11a5afdc1d18c97ae22",
+      "masked_sha256": "bf759f1556cf324f0fd389c3340dfc0ba4c0ab30663c051963aaa12e88b593c3"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-cross-profile-proposal/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "2d3e867bcd6acf8dff7f578add6ef2ba8765f5cc5d36e94f737816213821e332",
+      "new_sha256": "c06856124c0d0c7216f19ce4a76317be725ae79ff92424b3d86cb05c04a0cb63",
+      "masked_sha256": "3510deadd12bbcd4b08b9b5aa556d4bcb0572603e0a3f3caaccaa61b0119d964"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-profile/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "c9ce5029ff32d8de0f30b628cbbb43cf7dfd5369a08f25f1857e92777aaa1719",
+      "new_sha256": "754a336a5b6eb3d86a0ca1e37cd556cb33e08e18c7be3b32cbd4bcb495ae0143",
+      "masked_sha256": "a554d84b1f87ec91da0c0e9b34b6c875663a48c1b18e0f168f0289f9c83d3aab"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-purpose/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "c9ce5029ff32d8de0f30b628cbbb43cf7dfd5369a08f25f1857e92777aaa1719",
+      "new_sha256": "754a336a5b6eb3d86a0ca1e37cd556cb33e08e18c7be3b32cbd4bcb495ae0143",
+      "masked_sha256": "a554d84b1f87ec91da0c0e9b34b6c875663a48c1b18e0f168f0289f9c83d3aab"
+    },
+    {
+      "file": "golden-authority-v2/negative-receipt-unknown/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "02d9e6270816e9637b2ef3d8be03ef410fc90a0cae93ad0e49e1a9c9f511b8c5",
+      "new_sha256": "ff5d950fb534b8d2da00c4198b402de76d32067ab1cbfc06ca2c3a410d545bd6",
+      "masked_sha256": "6ae588058b41ec6f6bb3447fa0db00a7f5f9c94516ab4ba3473a56ed12730e21"
+    },
+    {
+      "file": "golden-authority-v2/negative-state-decided/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "dcfaf1dad01b476498d099f0fe788580781d7149fa28da561361808895ce9c77",
+      "new_sha256": "c06d4ed44f7b1a2b3c6363546da3b92d6ab1ba25f4f1ee8565caba74e1bfb7d7",
+      "masked_sha256": "1aae6a380b23980b97e66d59c4b9515f820ea05f716a68933dbd74dc7a857090"
+    },
+    {
+      "file": "golden-authority-v2/negative-state-stale-base/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "059942e419cf21f0f671ff2d8db293c5675675368785ffbeb116a985df481a41",
+      "new_sha256": "ded69f92e88bb3bbfe5e64637298cf049edd087b1e9278dcf23c0298479c3c86",
+      "masked_sha256": "6cfd326cf839fe3f669c222f222c94c504f8705092ce13af72871593fc78217c"
+    },
+    {
+      "file": "golden-authority-v2/negative-state-stale-current/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "5acffd99cbaa626dacbae2674bdb1c1784597c1c41f87580d0ce2080f1cea789",
+      "new_sha256": "e2ddc14f7bd1f2465d877320dc7eb510ab7da378a334721becd0e9cdfe25ba0a",
+      "masked_sha256": "a0a0ff7d05b5db53aab8e633aaded61f964e824c3f0d548a8a1bb0f75a4a2065"
+    },
+    {
+      "file": "golden-authority-v2/negative-storage-core-proposals/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "2488416b4358bb19d9c0e94866a14976f192ca1590b6613249b32fdaae45e63c",
+      "new_sha256": "9bc46ef4932b928f79f40d278401241c962232e4c391370d8411faabc89022fe",
+      "masked_sha256": "a329fed6e6fb0f9495b96dc5a516020c77950f8ad606b89e51994aa92b9f9049"
+    },
+    {
+      "file": "golden-authority-v2/negative-storage-owner-receipts/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "2488416b4358bb19d9c0e94866a14976f192ca1590b6613249b32fdaae45e63c",
+      "new_sha256": "9bc46ef4932b928f79f40d278401241c962232e4c391370d8411faabc89022fe",
+      "masked_sha256": "a329fed6e6fb0f9495b96dc5a516020c77950f8ad606b89e51994aa92b9f9049"
+    },
+    {
+      "file": "golden-authority-v2/negative-storage-proposal-decisions/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "2488416b4358bb19d9c0e94866a14976f192ca1590b6613249b32fdaae45e63c",
+      "new_sha256": "9bc46ef4932b928f79f40d278401241c962232e4c391370d8411faabc89022fe",
+      "masked_sha256": "a329fed6e6fb0f9495b96dc5a516020c77950f8ad606b89e51994aa92b9f9049"
+    },
+    {
+      "file": "golden-authority-v2/negative-storage-receipt-consumptions/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "2488416b4358bb19d9c0e94866a14976f192ca1590b6613249b32fdaae45e63c",
+      "new_sha256": "9bc46ef4932b928f79f40d278401241c962232e4c391370d8411faabc89022fe",
+      "masked_sha256": "a329fed6e6fb0f9495b96dc5a516020c77950f8ad606b89e51994aa92b9f9049"
+    },
+    {
+      "file": "golden-authority-v2/negative-writer-phase-fact-pinned/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "02d9e6270816e9637b2ef3d8be03ef410fc90a0cae93ad0e49e1a9c9f511b8c5",
+      "new_sha256": "ff5d950fb534b8d2da00c4198b402de76d32067ab1cbfc06ca2c3a410d545bd6",
+      "masked_sha256": "6ae588058b41ec6f6bb3447fa0db00a7f5f9c94516ab4ba3473a56ed12730e21"
+    },
+    {
+      "file": "golden-authority-v2/negative-writer-pinned/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "02d9e6270816e9637b2ef3d8be03ef410fc90a0cae93ad0e49e1a9c9f511b8c5",
+      "new_sha256": "ff5d950fb534b8d2da00c4198b402de76d32067ab1cbfc06ca2c3a410d545bd6",
+      "masked_sha256": "6ae588058b41ec6f6bb3447fa0db00a7f5f9c94516ab4ba3473a56ed12730e21"
+    },
+    {
+      "file": "golden-authority-v2/proposal-apply/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "b24fe9f546e3822bccb28319918b85b46d028c733926ae5d8b9e2ff496a8a716",
+      "new_sha256": "7b01a635bd92c05b319b4427c9c4ea45526e41d189effe77cc0eb69590b3f551",
+      "masked_sha256": "9580b18299aaf54a05546433833f86f17d0020e5e23ead4e8eede41f8fa3a705"
+    },
+    {
+      "file": "golden-authority-v2/proposal-idempotent/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "7750277701a9d9a3b3ab75db5fc164c44053c202a7fb923defe20a8e05819b4d",
+      "new_sha256": "e6098059a49790efe779afa517efbd9810b12a66d627d11f66c8c09f3d877839",
+      "masked_sha256": "c5e932fa9cbb25c30e4908aecf1bf8450be7d86de40edf9068c722a7ac8e57cc"
+    },
+    {
+      "file": "golden-authority-v2/proposal-reject/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "8468a4c12b8e4fc7094b9570d73af567d2fe8790ffff8c12056f76cafcecf6fa",
+      "new_sha256": "cb1a18b3a9240073c93724cd800d22c3b64aac940a04d7df07a126e5ce5d5446",
+      "masked_sha256": "461b8ed1780e321859ff5e71852c96e3271e02826061338adcf6c2e93468de4c"
+    },
+    {
+      "file": "golden-authority-v2/retract/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "fc8a0c29d2090f4315ebf412e06e5c73085900c1126e503b9bb3da76c2e7b83d",
+      "new_sha256": "49baf58c31967a1a04b9670edfb1078a17c1575671959d50c0e8ee75b108758c",
+      "masked_sha256": "1a40f7ec9e7e4ec7fd3cb80840d788f7cdaad2dcae2ec1d56f1ca32b5aa98641"
+    },
+    {
+      "file": "golden-authority-v2/stale-proposals/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "a2ec19088391b054a6db6acc1378b2920c441320cdbcd5d2e2a6a6ec1ef040f0",
+      "new_sha256": "45b8b44a20ae658db85b0e4a77c601ca3d858df4f006b6a91deaad523361f198",
+      "masked_sha256": "35f5df17b7cd8a82b0fa9c70d0f2c7ac48256b627adff3724b6ab95636b2dde0"
+    },
+    {
+      "file": "golden-mcp-v1/authority-apply/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "6545b16da67c9b581f3fc717f3b1858531beb35f12fb803240fad8da780c2d3b",
+      "new_sha256": "7ff110c74b52cbfbc1ab42af6ca3b391ab09b47589c78bffd99cca780bc8690b",
+      "masked_sha256": "49c03c1eec1d2d68c68813fbd097aede40d1031a8fe6b366e31297a779b953f2"
+    },
+    {
+      "file": "golden-mcp-v1/authority-apply/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "62211d876fe0ea90d294f7f6ffe0bb7d2f3679550da10bd552a59be521b3c9b5",
+      "new_sha256": "efdb47a9f53282b0c4eea07e6ae7f06081a36cd812b95052b0c80a6914175cde",
+      "masked_sha256": "6242ea61c61bf987bc8d19c588a8bc6fee2c006bf589ea1fc6b34f01ce3e3b1e"
+    },
+    {
+      "file": "golden-mcp-v1/authority-retract/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "bbf2a0d8fe6915ebf2aa2c2985b6620682572a691a655f26b72025621e0c25ec",
+      "new_sha256": "894cd730fad20aad6fccd7b1beadfdebf7053817f46665515e7d33db0d72aff2",
+      "masked_sha256": "a77467880cfcc47f355b519c21fcfbdfe6058b33d7479bdb9ef335c7d7056473"
+    },
+    {
+      "file": "golden-mcp-v1/authority-retract/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "3dec51ecf266349784465d2549872ae420f5a6edfe3a04960f4f5078fa9346b1",
+      "new_sha256": "5bab80c598c110cd77bc7053b6e6cf0aa62e56f255c46565c41cafa852e3f587",
+      "masked_sha256": "21fac82797d5075e546363c30435da4c9601748e32084e8b53b2821d18907ca2"
+    },
+    {
+      "file": "golden-mcp-v1/error-proposal-decided/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "49d0df4331e8753f6c1cb7467fd74db2d31801fca07f43c25f2a497d1986eb09",
+      "new_sha256": "53c473edf6380019016883195c05277d9af4305eb38719ccc4150b73d9a32a28",
+      "masked_sha256": "6527a49b5948ab21310e1eac91daa4d35293c4a4725725cbe0042ce861487241"
+    },
+    {
+      "file": "golden-mcp-v1/error-proposal-decided/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "49d0df4331e8753f6c1cb7467fd74db2d31801fca07f43c25f2a497d1986eb09",
+      "new_sha256": "53c473edf6380019016883195c05277d9af4305eb38719ccc4150b73d9a32a28",
+      "masked_sha256": "6527a49b5948ab21310e1eac91daa4d35293c4a4725725cbe0042ce861487241"
+    },
+    {
+      "file": "golden-mcp-v1/error-proposal-integrity/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "8741a3cabd6f3d40bc09bca18c3612b25694208ea0c1334f00ab4f6be90c5906",
+      "new_sha256": "fffcae99c0521dfbbfe5b44deca29aa743afdbb410e28aad977f5c03f7a96289",
+      "masked_sha256": "3f455dde3c0e0b53b04bb844827cbfb9175a8acb54e500d3be611be74fa6f897"
+    },
+    {
+      "file": "golden-mcp-v1/error-proposal-integrity/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "8741a3cabd6f3d40bc09bca18c3612b25694208ea0c1334f00ab4f6be90c5906",
+      "new_sha256": "fffcae99c0521dfbbfe5b44deca29aa743afdbb410e28aad977f5c03f7a96289",
+      "masked_sha256": "3f455dde3c0e0b53b04bb844827cbfb9175a8acb54e500d3be611be74fa6f897"
+    },
+    {
+      "file": "golden-mcp-v1/error-receipt-integrity/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "ece22af1b72fd49a6b495f149d3cb0c889e23c9a64237065b4c9a61710cfea98",
+      "new_sha256": "a97764bcd577caa63baf222494bab4af71b54cf637a4e419283192be4373c96e",
+      "masked_sha256": "4a108d853bb4eed23734d34fb64fefdec3f9ff2afaf31b5c026fa4649b87abe7"
+    },
+    {
+      "file": "golden-mcp-v1/error-receipt-integrity/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "ece22af1b72fd49a6b495f149d3cb0c889e23c9a64237065b4c9a61710cfea98",
+      "new_sha256": "a97764bcd577caa63baf222494bab4af71b54cf637a4e419283192be4373c96e",
+      "masked_sha256": "4a108d853bb4eed23734d34fb64fefdec3f9ff2afaf31b5c026fa4649b87abe7"
+    },
+    {
+      "file": "golden-mcp-v1/error-stale-authority/initial.sqlite3",
+      "size": 258048,
+      "old_sha256": "ffb1b53b400d09fb32fde616330615e9c4ed8151ba45cbdb7680facbadfa15ff",
+      "new_sha256": "5fdb8f5d9b9e2d03fe81dd269a2db2de10055626284cc4d8845c366712e50be5",
+      "masked_sha256": "51c29b49ffdec69d1666206ee668c819f07fe02d8b207f1f86d7caf449cbc44e"
+    },
+    {
+      "file": "golden-mcp-v1/error-stale-authority/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "ffb1b53b400d09fb32fde616330615e9c4ed8151ba45cbdb7680facbadfa15ff",
+      "new_sha256": "5fdb8f5d9b9e2d03fe81dd269a2db2de10055626284cc4d8845c366712e50be5",
+      "masked_sha256": "51c29b49ffdec69d1666206ee668c819f07fe02d8b207f1f86d7caf449cbc44e"
+    },
+    {
+      "file": "golden-mcp-v1/float-bounds/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "cb0d372b41d9fbb83920f09e30c596c1435220f544cf05570c74e3ebc01eba04",
+      "new_sha256": "a02653bd85a2ca27bdaf4e1e14d13b85729ba7c99e67e422a5013d36f3ef0409",
+      "masked_sha256": "f9e92ed5a1b7948c7535ca5e915206eda2a3bb07f40c3e9a540c9e1eef28681c"
+    },
+    {
+      "file": "golden-mcp-v1/foreign-store/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "0fe04dfcedb25fd0eb8bc72a2229d87fd92b9f98cd66ba201e53d5ecf05f2209",
+      "new_sha256": "9e7d4e704bf3a6bc5d32d795baf60b3f2f94a94a86868d3bc6a970b6f77b4a5e",
+      "masked_sha256": "d24dad66304ef82163b62636ee187c42013593b49d90724ae18b29a17c0e6086"
+    },
+    {
+      "file": "golden-mcp-v1/foreign-store/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "0fe04dfcedb25fd0eb8bc72a2229d87fd92b9f98cd66ba201e53d5ecf05f2209",
+      "new_sha256": "9e7d4e704bf3a6bc5d32d795baf60b3f2f94a94a86868d3bc6a970b6f77b4a5e",
+      "masked_sha256": "d24dad66304ef82163b62636ee187c42013593b49d90724ae18b29a17c0e6086"
+    },
+    {
+      "file": "golden-mcp-v1/future-store/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "39624816b23dd559578ac9310b2f6bf1fc0756a0a46acda82760903507893dbc",
+      "new_sha256": "b5831874f65e0cd25b2b3d3282079f59c8a60427475f8e6d519022e1bbeba6a5",
+      "masked_sha256": "35d22f6ee5704c5488bb4dd669a7457e342bd5fd1b4563b711a0e1d4de2b9d2d"
+    },
+    {
+      "file": "golden-mcp-v1/future-store/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "39624816b23dd559578ac9310b2f6bf1fc0756a0a46acda82760903507893dbc",
+      "new_sha256": "b5831874f65e0cd25b2b3d3282079f59c8a60427475f8e6d519022e1bbeba6a5",
+      "masked_sha256": "35d22f6ee5704c5488bb4dd669a7457e342bd5fd1b4563b711a0e1d4de2b9d2d"
+    },
+    {
+      "file": "golden-mcp-v1/p16-store-busy/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-mcp-v1/p16-store-busy/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "430bc69c4f91de71ca0ba203f8429ce1a277f40d8c06a48768c311cd37c01f73",
+      "new_sha256": "4bed6bcc284b6aa3b401da978a1e112a816228f2cc3eb80eff41306cc7b8b090",
+      "masked_sha256": "dfe5d21099ebfbb1fab0e4b89604f4d0e6347808bfe313392cc840f1bc5bc1a4"
+    },
+    {
+      "file": "golden-mcp-v1/positive-tools/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "7f52385ae91b69fe3737c84196cd899d97a096a0ce6e767bbfda2168284b2adf",
+      "new_sha256": "762e8e95155a3d0857ad5b7a7e18dce639df9d16ed96e4ec4a5e9fb1c6693c63",
+      "masked_sha256": "671fbffc212fd43e40127bcbed921452004f0746e4ac0b93fed676c67b79615c"
+    },
+    {
+      "file": "golden-mcp-v1/wal-sidecar/initial.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-mcp-v1/wal-sidecar/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-mcp-v1/work-env-blank/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "67c3dd9a517e169bce3343fe5a5156e2919e9312e060d272d519851bd78c28c8",
+      "new_sha256": "83a7e2eebf031ca08fef82ec5844b3f56c0cd5ac2f8da8d24d12bed4d7fa4307",
+      "masked_sha256": "9b83070b8cfdc3e6ae7d74201c18b42e29fa9a0f865d308f29bf4d85d5bc0042"
+    },
+    {
+      "file": "golden-mcp-v1/work-env-precedence/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "ec3226aa2ab4b3bdccff6d704652f20ce0f559cd3c38c15904c7d686dc0a2a91",
+      "new_sha256": "467440136b6702b3fb6120f04e7b578dbf9288c38ab526eb6c30faf222675fdd",
+      "masked_sha256": "4c9e75a79e588dd36c23881f3a553908db9286378e5a3368f0dbf0fc9d2d66fb"
+    },
+    {
+      "file": "golden-mcp-v1/work-env/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "7afd63f5e5b7fa8c3cb88954a8224ef9a71fc2bce9d8a0a9bec14efd0dd41673",
+      "new_sha256": "33033c7474c2dd95130270b94a32ad857a530d895e2131b2e3d8b24df10aa6a6",
+      "masked_sha256": "d6ed005665bf20ace8f7703d9b3c6a02057a9c1a77bd8e6838051e291322d9aa"
+    },
+    {
+      "file": "golden-mcp-v1/work-store-error/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "20ea2f73c24d955629bbd1e22e828d2ef80c031ea894a6f04ff76852fda23316",
+      "new_sha256": "43250ccfd1ee84477eb3e1fae66c06df000da977b051f081011f0e8e6c3db9fa",
+      "masked_sha256": "03a33526ce372189e208f31c0410ec2e421366f96be7a85520400cd9b8628829"
+    },
+    {
+      "file": "golden-cli-v1/apply-receipt-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "apply-receipt-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/apply-receipt-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "apply-receipt-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/apply-receipt-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/approve-core-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "approve-core-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/approve-core-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "approve-core-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/approve-core-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/approve-retract-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "approve-retract-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/approve-retract-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "approve-retract-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/approve-retract-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-inline-failure/expected.json",
+      "size": 249856,
+      "old_sha256": "1e2aa0dfb3d780db46d8664e63b901c4c4349a335575155b3181dcd1748a66f2",
+      "new_sha256": "25d020d6d0865210beda3e2003a529bce42f47c74a899c46560dfd528f617163",
+      "masked_sha256": "59e7d5fd0eb9cafbc4fecc62e5941ebe6f510c7b34986d99be70ad50a1636cd6",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-inline-failure/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-inline-failure/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-inline/expected.json",
+      "size": 258048,
+      "old_sha256": "86b24c0b89277156699002cd19aef7b60eb5f2290fef2d5a8cf5931c52b8011f",
+      "new_sha256": "2bb542ddbabd014b182d2dbbd923f98b5e49be840b529cc210266582c77fe20c",
+      "masked_sha256": "5c828241a12da014c3c24ca08360be3d9ef24e10cfce3c15dee6ff6367e064b1",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-inline/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-inline/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-apply-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-invalid-utf8/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-issue-only/expected.json",
+      "size": 249856,
+      "old_sha256": "1e2aa0dfb3d780db46d8664e63b901c4c4349a335575155b3181dcd1748a66f2",
+      "new_sha256": "25d020d6d0865210beda3e2003a529bce42f47c74a899c46560dfd528f617163",
+      "masked_sha256": "59e7d5fd0eb9cafbc4fecc62e5941ebe6f510c7b34986d99be70ad50a1636cd6",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-issue-only/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-issue-only/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-apply-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-mismatch/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-apply-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-apply-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-apply-no-tty/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-inline-failure/expected.json",
+      "size": 249856,
+      "old_sha256": "24fa5fa024049cb7a8f71967812c6255c809cb5aaf5f06afc99d3100cd9a9270",
+      "new_sha256": "92eb8a904b64f9e066286a2c2962133fbf657fda7d33a556ef45f81597e0e794",
+      "masked_sha256": "5d2bca2e55770363c9d898a012e1f94b7490c90fd989298cbba1800d2f36a081",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-inline-failure/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-inline-failure/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-inline/expected.json",
+      "size": 249856,
+      "old_sha256": "6aedb3baf202e4b9d7e5f5fed5b676d69e84e8152b6b9e88c048cecb9330b572",
+      "new_sha256": "9328e4d688d2bfb2402d9fdc19db0f5e8f92977369fd7b23ec40545a0cc00d91",
+      "masked_sha256": "4bb1b348c800edf2ab9ad17d26d9d17cab77a982e70be5758712b4686bde95b2",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-inline/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-inline/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-reject-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-invalid-utf8/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-issue-only/expected.json",
+      "size": 249856,
+      "old_sha256": "24fa5fa024049cb7a8f71967812c6255c809cb5aaf5f06afc99d3100cd9a9270",
+      "new_sha256": "92eb8a904b64f9e066286a2c2962133fbf657fda7d33a556ef45f81597e0e794",
+      "masked_sha256": "5d2bca2e55770363c9d898a012e1f94b7490c90fd989298cbba1800d2f36a081",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-issue-only/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-issue-only/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-reject-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-mismatch/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-core-reject-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-core-reject-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-core-reject-no-tty/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "801382241809300fc6041ace0888cb371a4c9af57381f2ed10be00c5ccc2bb5c",
+      "new_sha256": "557b3b4081a0d388a362169b7a232be73091965e0c42e9827277cc85a8cd0491",
+      "masked_sha256": "d3609f7dfca052762b08a33d3ad31ca0cfe6e11ed20743015fac84c9f2b16ff4"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-inline-failure/expected.json",
+      "size": 249856,
+      "old_sha256": "f62cf9fa04da156cf0fee1e6142fb14bc3f2e7e90c2750f566772bc7caf83703",
+      "new_sha256": "67a1843eae01b21db678a783f8557afd864088438f203ebfa6f2fe353411b10b",
+      "masked_sha256": "54859ec516e89a72c9761e621716b627828a115f1a63dff3966a0643111f66c6",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-inline-failure/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-inline-failure/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-inline/expected.json",
+      "size": 249856,
+      "old_sha256": "ca0576390a763c052592a6493a678dd221cc69c55e49b1c2017eec839f9fd788",
+      "new_sha256": "b72e8190ef168eb4698d06d5167248130b3299262377ac22e53383633f5b4707",
+      "masked_sha256": "78682dfc2704db913d9995fce22b581cb7b166e9fef789f0154a505575413c9f",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-inline/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-inline/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-invalid-utf8/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-retract-invalid-utf8/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-invalid-utf8/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-issue-only/expected.json",
+      "size": 249856,
+      "old_sha256": "f62cf9fa04da156cf0fee1e6142fb14bc3f2e7e90c2750f566772bc7caf83703",
+      "new_sha256": "67a1843eae01b21db678a783f8557afd864088438f203ebfa6f2fe353411b10b",
+      "masked_sha256": "54859ec516e89a72c9761e621716b627828a115f1a63dff3966a0643111f66c6",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-issue-only/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-issue-only/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-mismatch/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-retract-mismatch/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-mismatch/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "authority-retract-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-no-tty/expected.json",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "authority-retract-no-tty/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/authority-retract-no-tty/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "08ab2bb1d30c974704ef809ef27768b39baa2697f7365ef0a5b779eb6a2397a3",
+      "new_sha256": "9562c1c0d8358b335bf3c8ba39f5b3fe80e41fb85c55e4a953853d0e3cacc7ae",
+      "masked_sha256": "0d1c6a8a39861ae547e13a53d14275bef26f15406b31de1321a7cade2a7b4f99"
+    },
+    {
+      "file": "golden-cli-v1/close-legacy-discussion-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "close-legacy-discussion-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/close-legacy-discussion-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "close-legacy-discussion-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/close-legacy-discussion-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/close-loop-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "5ee78bb7b0a1bc8ff1707d8e2d25a594d63b389b69e90e13d29c21ebb54c78fe",
+      "new_sha256": "4d629feec9bf75ff21ae0e999ca2444ce1386d6a0a3f68e3588e485a28541322",
+      "masked_sha256": "1a5ff3431f226bde8f57dd7f660dcf523167c5c5d7f7fd0861e03382719af6d1",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "close-loop-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/close-loop-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "close-loop-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/close-loop-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "close-loop-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/close-loop-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/core-proposals-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "core-proposals-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/core-proposals-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "core-proposals-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/core-proposals-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/decay-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "5ee78bb7b0a1bc8ff1707d8e2d25a594d63b389b69e90e13d29c21ebb54c78fe",
+      "new_sha256": "4d629feec9bf75ff21ae0e999ca2444ce1386d6a0a3f68e3588e485a28541322",
+      "masked_sha256": "1a5ff3431f226bde8f57dd7f660dcf523167c5c5d7f7fd0861e03382719af6d1",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "decay-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/decay-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "decay-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/decay-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "decay-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/decay-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/doctor-failed-check/expected.json",
+      "size": 249856,
+      "old_sha256": "ce933d99fb74d1caded54e9e20d528bdd9c40dd670a8b15892ccc1af28932596",
+      "new_sha256": "2f020b5882d62b2f8aedd02bdd0206bccf7fffdfd9b3b46329ccb7cc8c003364",
+      "masked_sha256": "980efbd9e83fd90f93d554719c2e4112bbe0fb111074b2c668b38093f1f6adde",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-failed-check/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-failed-check/expected.json",
+      "size": 249856,
+      "old_sha256": "ce933d99fb74d1caded54e9e20d528bdd9c40dd670a8b15892ccc1af28932596",
+      "new_sha256": "2f020b5882d62b2f8aedd02bdd0206bccf7fffdfd9b3b46329ccb7cc8c003364",
+      "masked_sha256": "980efbd9e83fd90f93d554719c2e4112bbe0fb111074b2c668b38093f1f6adde",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-failed-check/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-failed-check/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "ce933d99fb74d1caded54e9e20d528bdd9c40dd670a8b15892ccc1af28932596",
+      "new_sha256": "2f020b5882d62b2f8aedd02bdd0206bccf7fffdfd9b3b46329ccb7cc8c003364",
+      "masked_sha256": "980efbd9e83fd90f93d554719c2e4112bbe0fb111074b2c668b38093f1f6adde"
+    },
+    {
+      "file": "golden-cli-v1/doctor-foreign/expected.json",
+      "size": 249856,
+      "old_sha256": "0fe04dfcedb25fd0eb8bc72a2229d87fd92b9f98cd66ba201e53d5ecf05f2209",
+      "new_sha256": "9e7d4e704bf3a6bc5d32d795baf60b3f2f94a94a86868d3bc6a970b6f77b4a5e",
+      "masked_sha256": "d24dad66304ef82163b62636ee187c42013593b49d90724ae18b29a17c0e6086",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-foreign/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-foreign/expected.json",
+      "size": 249856,
+      "old_sha256": "0fe04dfcedb25fd0eb8bc72a2229d87fd92b9f98cd66ba201e53d5ecf05f2209",
+      "new_sha256": "9e7d4e704bf3a6bc5d32d795baf60b3f2f94a94a86868d3bc6a970b6f77b4a5e",
+      "masked_sha256": "d24dad66304ef82163b62636ee187c42013593b49d90724ae18b29a17c0e6086",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-foreign/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-foreign/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "0fe04dfcedb25fd0eb8bc72a2229d87fd92b9f98cd66ba201e53d5ecf05f2209",
+      "new_sha256": "9e7d4e704bf3a6bc5d32d795baf60b3f2f94a94a86868d3bc6a970b6f77b4a5e",
+      "masked_sha256": "d24dad66304ef82163b62636ee187c42013593b49d90724ae18b29a17c0e6086"
+    },
+    {
+      "file": "golden-cli-v1/doctor-future/expected.json",
+      "size": 249856,
+      "old_sha256": "39624816b23dd559578ac9310b2f6bf1fc0756a0a46acda82760903507893dbc",
+      "new_sha256": "b5831874f65e0cd25b2b3d3282079f59c8a60427475f8e6d519022e1bbeba6a5",
+      "masked_sha256": "35d22f6ee5704c5488bb4dd669a7457e342bd5fd1b4563b711a0e1d4de2b9d2d",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-future/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-future/expected.json",
+      "size": 249856,
+      "old_sha256": "39624816b23dd559578ac9310b2f6bf1fc0756a0a46acda82760903507893dbc",
+      "new_sha256": "b5831874f65e0cd25b2b3d3282079f59c8a60427475f8e6d519022e1bbeba6a5",
+      "masked_sha256": "35d22f6ee5704c5488bb4dd669a7457e342bd5fd1b4563b711a0e1d4de2b9d2d",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-future/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-future/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "39624816b23dd559578ac9310b2f6bf1fc0756a0a46acda82760903507893dbc",
+      "new_sha256": "b5831874f65e0cd25b2b3d3282079f59c8a60427475f8e6d519022e1bbeba6a5",
+      "masked_sha256": "35d22f6ee5704c5488bb4dd669a7457e342bd5fd1b4563b711a0e1d4de2b9d2d"
+    },
+    {
+      "file": "golden-cli-v1/doctor-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/doctor-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-v3/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-v3/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-v3/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b"
+    },
+    {
+      "file": "golden-cli-v1/doctor-wal/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "doctor-wal/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-wal/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "doctor-wal/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/doctor-wal/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/error-owner-pinned-target/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-owner-pinned-target/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-owner-pinned-target/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-owner-pinned-target/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-owner-pinned-target/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-decided/expected.json",
+      "size": 249856,
+      "old_sha256": "49d0df4331e8753f6c1cb7467fd74db2d31801fca07f43c25f2a497d1986eb09",
+      "new_sha256": "53c473edf6380019016883195c05277d9af4305eb38719ccc4150b73d9a32a28",
+      "masked_sha256": "6527a49b5948ab21310e1eac91daa4d35293c4a4725725cbe0042ce861487241",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-proposal-decided/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-decided/expected.json",
+      "size": 249856,
+      "old_sha256": "49d0df4331e8753f6c1cb7467fd74db2d31801fca07f43c25f2a497d1986eb09",
+      "new_sha256": "53c473edf6380019016883195c05277d9af4305eb38719ccc4150b73d9a32a28",
+      "masked_sha256": "6527a49b5948ab21310e1eac91daa4d35293c4a4725725cbe0042ce861487241",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-proposal-decided/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-decided/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "49d0df4331e8753f6c1cb7467fd74db2d31801fca07f43c25f2a497d1986eb09",
+      "new_sha256": "53c473edf6380019016883195c05277d9af4305eb38719ccc4150b73d9a32a28",
+      "masked_sha256": "6527a49b5948ab21310e1eac91daa4d35293c4a4725725cbe0042ce861487241"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-integrity/expected.json",
+      "size": 249856,
+      "old_sha256": "8741a3cabd6f3d40bc09bca18c3612b25694208ea0c1334f00ab4f6be90c5906",
+      "new_sha256": "fffcae99c0521dfbbfe5b44deca29aa743afdbb410e28aad977f5c03f7a96289",
+      "masked_sha256": "3f455dde3c0e0b53b04bb844827cbfb9175a8acb54e500d3be611be74fa6f897",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-proposal-integrity/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-integrity/expected.json",
+      "size": 249856,
+      "old_sha256": "8741a3cabd6f3d40bc09bca18c3612b25694208ea0c1334f00ab4f6be90c5906",
+      "new_sha256": "fffcae99c0521dfbbfe5b44deca29aa743afdbb410e28aad977f5c03f7a96289",
+      "masked_sha256": "3f455dde3c0e0b53b04bb844827cbfb9175a8acb54e500d3be611be74fa6f897",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-proposal-integrity/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-proposal-integrity/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "8741a3cabd6f3d40bc09bca18c3612b25694208ea0c1334f00ab4f6be90c5906",
+      "new_sha256": "fffcae99c0521dfbbfe5b44deca29aa743afdbb410e28aad977f5c03f7a96289",
+      "masked_sha256": "3f455dde3c0e0b53b04bb844827cbfb9175a8acb54e500d3be611be74fa6f897"
+    },
+    {
+      "file": "golden-cli-v1/error-receipt-integrity/expected.json",
+      "size": 249856,
+      "old_sha256": "ece22af1b72fd49a6b495f149d3cb0c889e23c9a64237065b4c9a61710cfea98",
+      "new_sha256": "a97764bcd577caa63baf222494bab4af71b54cf637a4e419283192be4373c96e",
+      "masked_sha256": "4a108d853bb4eed23734d34fb64fefdec3f9ff2afaf31b5c026fa4649b87abe7",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-receipt-integrity/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-receipt-integrity/expected.json",
+      "size": 249856,
+      "old_sha256": "ece22af1b72fd49a6b495f149d3cb0c889e23c9a64237065b4c9a61710cfea98",
+      "new_sha256": "a97764bcd577caa63baf222494bab4af71b54cf637a4e419283192be4373c96e",
+      "masked_sha256": "4a108d853bb4eed23734d34fb64fefdec3f9ff2afaf31b5c026fa4649b87abe7",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-receipt-integrity/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-receipt-integrity/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "ece22af1b72fd49a6b495f149d3cb0c889e23c9a64237065b4c9a61710cfea98",
+      "new_sha256": "a97764bcd577caa63baf222494bab4af71b54cf637a4e419283192be4373c96e",
+      "masked_sha256": "4a108d853bb4eed23734d34fb64fefdec3f9ff2afaf31b5c026fa4649b87abe7"
+    },
+    {
+      "file": "golden-cli-v1/error-stale-authority/expected.json",
+      "size": 258048,
+      "old_sha256": "ffb1b53b400d09fb32fde616330615e9c4ed8151ba45cbdb7680facbadfa15ff",
+      "new_sha256": "5fdb8f5d9b9e2d03fe81dd269a2db2de10055626284cc4d8845c366712e50be5",
+      "masked_sha256": "51c29b49ffdec69d1666206ee668c819f07fe02d8b207f1f86d7caf449cbc44e",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-stale-authority/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-stale-authority/expected.json",
+      "size": 258048,
+      "old_sha256": "ffb1b53b400d09fb32fde616330615e9c4ed8151ba45cbdb7680facbadfa15ff",
+      "new_sha256": "5fdb8f5d9b9e2d03fe81dd269a2db2de10055626284cc4d8845c366712e50be5",
+      "masked_sha256": "51c29b49ffdec69d1666206ee668c819f07fe02d8b207f1f86d7caf449cbc44e",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-stale-authority/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-stale-authority/fixture/store.sqlite3",
+      "size": 258048,
+      "old_sha256": "ffb1b53b400d09fb32fde616330615e9c4ed8151ba45cbdb7680facbadfa15ff",
+      "new_sha256": "5fdb8f5d9b9e2d03fe81dd269a2db2de10055626284cc4d8845c366712e50be5",
+      "masked_sha256": "51c29b49ffdec69d1666206ee668c819f07fe02d8b207f1f86d7caf449cbc44e"
+    },
+    {
+      "file": "golden-cli-v1/error-untyped-crash/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "error-untyped-crash/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-untyped-crash/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "error-untyped-crash/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/error-untyped-crash/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/init-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "5ee78bb7b0a1bc8ff1707d8e2d25a594d63b389b69e90e13d29c21ebb54c78fe",
+      "new_sha256": "4d629feec9bf75ff21ae0e999ca2444ce1386d6a0a3f68e3588e485a28541322",
+      "masked_sha256": "1a5ff3431f226bde8f57dd7f660dcf523167c5c5d7f7fd0861e03382719af6d1",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "init-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/init-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "init-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/init-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "init-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/init-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/log-fact-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "80dc722080e05f1586201126548edd616d27ec883358621435a0bd42c44cb07b",
+      "new_sha256": "944e238f67204e27767543a97991828a8e95ec1ddebc430d3dc19c3ae65e53f3",
+      "masked_sha256": "012acce601dcf7f73f0214707c92b23fce77b5a8f3b22f9172853d2528f26b10",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "log-fact-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/log-fact-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "916db9d7c8efdd51185374ee457aaa548f8c88e44ed2ada74851ef4a37ded134",
+      "new_sha256": "5c0d8bebc28111f7b4251d09b917fdc391f66cc6a112c9b91c3ebb96b794ce3d",
+      "masked_sha256": "e2576d69489796cfc415d24c4ee0dc4338923b1b40dbba85bdfd3303a6251b44",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "log-fact-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/log-fact-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/log-phase-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "21a4c5a156d29b6ccaa4b0feb7b3a3589b91c40ec8ab1fb7f9abe27912be078e",
+      "new_sha256": "2693b88311e25b4c915fb01220328474411857895c90da640871661a0d32324a",
+      "masked_sha256": "dd2795aea16b8e7a889770a8a0fefc415d4cee6e4dfe1f07e140774f94d3d547",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "log-phase-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/log-phase-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "0be9c952822c6fd4797b644bf2f302febf3b3b8a36939cb4a8c08c00b253e6e0",
+      "new_sha256": "bdd21f13c3341d24cba05046bd80be357c474f30e8080558d1665007e4744c6d",
+      "masked_sha256": "a0cba1a5c2b1523846059bcd3949b8ac090e5de11819ae7880dc657ce4f67b59",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "log-phase-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/log-phase-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/migrate-to-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "d201bd187beda2a2e43e44107c4cedf478624739bf039081daf9279c2264e684",
+      "new_sha256": "4c19a0976c0199daf7724bcb356c018e91c6d2a8d41ea585fd97d34ef2ff3783",
+      "masked_sha256": "d222026a5bea4028c7649ba292a882572fc6a6db7d25bb0c60395b4f810bf970",
+      "json_path": [
+        "databases",
+        "target.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migrate-to-missing/target.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migrate-to-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migrate-to-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migrate-to-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "migrate-to-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migrate-to-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/migration-missing-backup-equal/expected.json",
+      "size": 249856,
+      "old_sha256": "d201bd187beda2a2e43e44107c4cedf478624739bf039081daf9279c2264e684",
+      "new_sha256": "4c19a0976c0199daf7724bcb356c018e91c6d2a8d41ea585fd97d34ef2ff3783",
+      "masked_sha256": "d222026a5bea4028c7649ba292a882572fc6a6db7d25bb0c60395b4f810bf970",
+      "json_path": [
+        "databases",
+        "target.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migration-missing-backup-equal/target.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migration-v2/expected.json",
+      "size": 278528,
+      "old_sha256": "d74289587bd68262aa1718181a040f942474b52e0b1b789151ce38a17cbc64bd",
+      "new_sha256": "227166e096a8e7e119c482e87ada5036be8b80b218942e9a3d6ee880fad5ff9e",
+      "masked_sha256": "78cd44ad1884282623de17b7d9b1aab69a56291e505b333570b54c0878b17692",
+      "json_path": [
+        "databases",
+        "target.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migration-v2/target.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migration-v3/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "9663a9d8bbd1a3a308b064cf3ebdac67cb6aaf179d27c75853bce29b10b5d26a",
+      "new_sha256": "accfb34648f71f260421dc51562521a48e4911b96e49752313cd740d63d6a475",
+      "masked_sha256": "e0f58ac8dcb9f580ee0e9644e71b791f27d889eece64c2df34f696370f5f8698",
+      "json_path": [
+        "databases",
+        "target.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "migration-v3/target.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "databases",
+        "target.sqlite3.v3.bak",
+        "oracle_sha256"
+      ],
+      "reference_file": "migration-v3/target.sqlite3.v3.bak"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "migration-v3/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/expected.json",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b",
+      "json_path": [
+        "tree",
+        "target.sqlite3.v3.bak",
+        "sha256"
+      ],
+      "reference_file": "migration-v3/target.sqlite3.v3.bak"
+    },
+    {
+      "file": "golden-cli-v1/migration-v3/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "1be08c9b74eaccd6f39a80029a6f496c811918aa4795c3d7d83dfc3b975c7252",
+      "new_sha256": "688f51184c4018704102cf7e753e5aba2915b31507a98ee401927a890d4d3011",
+      "masked_sha256": "989f11690eca8aa73ec514b2e0ed82fbbbdfe5adbbcf421c470c3990934c797b"
+    },
+    {
+      "file": "golden-cli-v1/p16-store-busy/expected.json",
+      "size": 249856,
+      "old_sha256": "430bc69c4f91de71ca0ba203f8429ce1a277f40d8c06a48768c311cd37c01f73",
+      "new_sha256": "4bed6bcc284b6aa3b401da978a1e112a816228f2cc3eb80eff41306cc7b8b090",
+      "masked_sha256": "dfe5d21099ebfbb1fab0e4b89604f4d0e6347808bfe313392cc840f1bc5bc1a4",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "p16-store-busy/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/p16-store-busy/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/profiles-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "profiles-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/profiles-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "profiles-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/profiles-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-history/expected.json",
+      "size": 249856,
+      "old_sha256": "076aaa0bc9ec02cc94adde292eef8a89726ace6196d18eb10c49b3ea088eb794",
+      "new_sha256": "2f2d95e22dccdd2d9e6ca2149fafcfe11587602b5beba1d63978fb6e4996b693",
+      "masked_sha256": "ff03b9813216a60d7afbfdb993cce79e1aca73bbc125cf4a3549847c4847cdd0",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "retrieve-history/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-history/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-packet/expected.json",
+      "size": 249856,
+      "old_sha256": "076aaa0bc9ec02cc94adde292eef8a89726ace6196d18eb10c49b3ea088eb794",
+      "new_sha256": "2f2d95e22dccdd2d9e6ca2149fafcfe11587602b5beba1d63978fb6e4996b693",
+      "masked_sha256": "ff03b9813216a60d7afbfdb993cce79e1aca73bbc125cf4a3549847c4847cdd0",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "retrieve-packet/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-packet/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-readonly/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "retrieve-readonly/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-readonly/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "retrieve-readonly/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-readonly/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "076aaa0bc9ec02cc94adde292eef8a89726ace6196d18eb10c49b3ea088eb794",
+      "new_sha256": "2f2d95e22dccdd2d9e6ca2149fafcfe11587602b5beba1d63978fb6e4996b693",
+      "masked_sha256": "ff03b9813216a60d7afbfdb993cce79e1aca73bbc125cf4a3549847c4847cdd0",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "retrieve-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/retrieve-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/setup-missing/expected.json",
+      "size": 249856,
+      "old_sha256": "5ee78bb7b0a1bc8ff1707d8e2d25a594d63b389b69e90e13d29c21ebb54c78fe",
+      "new_sha256": "4d629feec9bf75ff21ae0e999ca2444ce1386d6a0a3f68e3588e485a28541322",
+      "masked_sha256": "1a5ff3431f226bde8f57dd7f660dcf523167c5c5d7f7fd0861e03382719af6d1",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "setup-missing/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/setup-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "setup-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/setup-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "setup-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/setup-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/status-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "status-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/status-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "status-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/status-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/timeline-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "timeline-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/timeline-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "timeline-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/timeline-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    },
+    {
+      "file": "golden-cli-v1/work-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "databases",
+        "store.sqlite3",
+        "oracle_sha256"
+      ],
+      "reference_file": "work-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/work-ready/expected.json",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba",
+      "json_path": [
+        "tree",
+        "store.sqlite3",
+        "unchanged_sha256"
+      ],
+      "reference_file": "work-ready/store.sqlite3"
+    },
+    {
+      "file": "golden-cli-v1/work-ready/fixture/store.sqlite3",
+      "size": 249856,
+      "old_sha256": "605b534d45738b0f3cfa502035b0489afdd1673a84316a69408a14edb7d0b5af",
+      "new_sha256": "149d331f21c6392e0c03318b23a63d347dc5b5923978a7ebdf6fb229f8f780d3",
+      "masked_sha256": "3b12ed24f2b9a93733a1e97b35b9f8abb4d7e025aeb9dde34a578166abc581ba"
+    }
+  ]
+}

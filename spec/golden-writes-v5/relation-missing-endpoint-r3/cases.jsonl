@@ -1,0 +1,1 @@
+{"label":"relation-missing-endpoint-r3","results":[{"call":"initialize","index":0,"result":{"application_id":1095582515,"changed":true,"migrated_from":null,"state":"ready","user_version":5}},{"call":"add_relation","index":1,"result":{"error":"IntegrityError","message":"FOREIGN KEY constraint failed","no_operation":true,"store_bytes_unchanged":true}}]}

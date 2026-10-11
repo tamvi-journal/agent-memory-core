@@ -5,7 +5,6 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
-  utimesSync,
   openSync,
   readFileSync,
   readSync,
@@ -13,7 +12,9 @@ import {
   unlinkSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { openDatabase } from "./sqlite-errors.ts";
+import { copyBackup, sourceBackupTime } from "./backup-time.ts";
 import { fileURLToPath } from "node:url";
 import {
   FileExistsError,
@@ -58,10 +59,11 @@ export type Row = Record<string, string | number | bigint | null>;
 type Header = { applicationId: number; userVersion: number; wal: boolean; empty: boolean };
 type Facts = { applicationId: number; userVersion: number; tables: Set<string> };
 
-function readHeader(path: string): Header {
+function readHeader(path: string, writable = false): Header {
   const absolute = resolve(path);
   for (const suffix of ["-wal", "-shm"]) {
-    if (existsSync(absolute + suffix)) throw new IncompatibleJournalMode(`SQLite WAL sidecar present. ${REPAIR}`);
+    if (!writable && existsSync(absolute + suffix))
+      throw new IncompatibleJournalMode(`SQLite WAL sidecar present. ${REPAIR}`);
   }
   const size = statSync(absolute).size;
   if (size === 0) return { applicationId: 0, userVersion: 0, wal: false, empty: true };
@@ -78,7 +80,9 @@ function readHeader(path: string): Header {
     throw new SchemaVersionError("memory database is not initialized");
   }
   const wal = header[18] === 2 || header[19] === 2;
-  if (wal) throw new IncompatibleJournalMode(`SQLite journal_mode=wal. ${REPAIR}`);
+  if (writable && (header.readInt32BE(60) > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(header.readInt32BE(68))))
+    throw new SchemaVersionError("database application_id/user_version is newer or foreign");
+  if (wal && !writable) throw new IncompatibleJournalMode(`SQLite journal_mode=wal. ${REPAIR}`);
   return { applicationId: header.readInt32BE(68), userVersion: header.readInt32BE(60), wal, empty: false };
 }
 
@@ -518,7 +522,7 @@ export class MemoryStore {
       throw new MigrationRequired("schema v3 store must be initialized or migrated to v5 before use");
     }
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { readOnly: true, enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { readOnly: true, enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       verifyConnection(database, false);
       this.#database = database;
@@ -543,27 +547,45 @@ export class MemoryStore {
   } {
     this.close();
     if (this.exists() && statSync(this.path).size > 0) {
-      const header = readHeader(this.path);
+      const header = readHeader(this.path, true);
       if (header.applicationId === APPLICATION_ID && header.userVersion === LEGACY_V4_VERSION) {
         throw new MigrationRequired("schema v4 store must be migrated to v5 before writing");
       }
       if (header.userVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(header.applicationId)) {
         throw new SchemaVersionError("database application_id/user_version is newer or foreign");
       }
-      const current = this.schemaInfo();
-      if (current.state === "ready") return { ...current, changed: false, migrated_from: null };
     }
     mkdirSync(dirname(this.path), { recursive: true });
-    const database = new DatabaseSync(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
     try {
+      // Frozen writable-open repair occurs before the P17 guard transaction.
+      const openedVersion = Number((database.prepare("PRAGMA user_version").get() as Row).user_version);
+      const openedApplication = Number((database.prepare("PRAGMA application_id").get() as Row).application_id);
+      if (openedVersion > SCHEMA_VERSION || ![0, APPLICATION_ID].includes(openedApplication))
+        throw new SchemaVersionError("database application_id/user_version is newer or foreign");
+      const mode = String((database.prepare("PRAGMA journal_mode=DELETE").get() as Row).journal_mode).toLowerCase();
+      if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
+      database.exec("BEGIN IMMEDIATE");
+      const facts = inspect(database),
+        state = classify(facts);
+      if (state === "ready") {
+        database.exec("COMMIT");
+        return {
+          application_id: facts.applicationId,
+          user_version: facts.userVersion,
+          state,
+          changed: false,
+          migrated_from: null,
+        };
+      }
       database.exec(readFileSync(SCHEMA_PATH, "utf8"));
       database.exec(
         `INSERT INTO memory_meta_v3(key,value) VALUES('schema_version','5') ON CONFLICT(key) DO UPDATE SET value=excluded.value; PRAGMA application_id=${APPLICATION_ID}; PRAGMA user_version=${SCHEMA_VERSION};`,
       );
-      const mode = String(
-        (database.prepare("PRAGMA journal_mode=DELETE").get() as Record<string, unknown>).journal_mode,
-      ).toLowerCase();
-      if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
+      database.exec("COMMIT");
+    } catch (error) {
+      if (database.isTransaction) database.exec("ROLLBACK");
+      throw error;
     } finally {
       database.close();
     }
@@ -575,7 +597,7 @@ export class MemoryStore {
     this.close();
     readHeader(this.path);
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
+    const database = openDatabase(this.path, { enableForeignKeyConstraints: true, timeout: 5000 });
     try {
       verifyConnection(database, true);
       database.exec("BEGIN IMMEDIATE");
@@ -613,10 +635,9 @@ export class MemoryStore {
     if (!options.dryRun) {
       if (normcase(backup) === normcase(target)) throw new ValueError("backup path must differ from target");
       if (existsSync(backup)) throw new FileExistsError(backup);
+      const sourceTime = sourceBackupTime(this.path);
       mkdirSync(dirname(resolve(target)), { recursive: true });
-      const sourceStat = statSync(this.path);
-      copyFileSync(this.path, backup);
-      utimesSync(backup, sourceStat.atime, sourceStat.mtime);
+      copyBackup(this.path, backup, sourceTime);
       // Outside cleanup: an aliased target must never cause backup deletion.
       if (existsSync(target)) throw new FileExistsError(target);
     }
@@ -626,9 +647,10 @@ export class MemoryStore {
     try {
       copyFileSync(this.path, work);
       readHeader(work);
-      const database = new DatabaseSync(work, { enableForeignKeyConstraints: true, timeout: 5000 });
+      const database = openDatabase(work, { enableForeignKeyConstraints: true, timeout: 5000 });
       try {
         database.exec(readFileSync(SCHEMA_PATH, "utf8"));
+        database.exec("BEGIN IMMEDIATE");
         if (before.state === "legacy-v2") migrateV2(database, this.clock);
         backfillRelations(database);
         database
@@ -637,6 +659,7 @@ export class MemoryStore {
           )
           .run();
         database.exec(`PRAGMA application_id=${APPLICATION_ID}; PRAGMA user_version=${SCHEMA_VERSION};`);
+        database.exec("COMMIT");
         const mode = String((database.prepare("PRAGMA journal_mode=DELETE").get() as Row).journal_mode).toLowerCase();
         if (mode !== "delete") throw new IncompatibleJournalMode(`SQLite refused journal_mode=DELETE. ${REPAIR}`);
       } finally {
@@ -706,7 +729,7 @@ export class MemoryStore {
     if (!this.exists()) return { application_id: 0, user_version: 0, state: "uninitialized" };
     readHeader(this.path);
     hooks.beforeOpen?.(this.path);
-    const database = new DatabaseSync(this.path, { readOnly: true, timeout: 5000 });
+    const database = openDatabase(this.path, { readOnly: true, timeout: 5000 });
     try {
       const facts = inspect(database);
       const mode = String(

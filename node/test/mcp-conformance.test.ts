@@ -17,6 +17,7 @@ import {
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
+import { heldWriter } from "./held-writer.ts";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
@@ -420,7 +421,20 @@ for (const name of readdirSync(GOLDEN)
       profile = invocation.profile;
       extraEnv = invocation.env;
     }
-    const result = await runMcp(directory, profile, readFileSync(resolve(scenario, "transcript.in")), extraEnv);
+    const runVictim = async () => {
+      const before = name === "p16-store-busy" ? readFileSync(resolve(directory, "store.sqlite3")) : null;
+      const start = performance.now();
+      const result = await runMcp(directory, profile, readFileSync(resolve(scenario, "transcript.in")), extraEnv);
+      if (before) {
+        assert(performance.now() - start >= 4500);
+        assert(result.stdout.includes("StoreBusy: store is busy; retry later"));
+        assert.equal(result.stderr.length, 0);
+        assert.deepEqual(readFileSync(resolve(directory, "store.sqlite3")), before);
+      }
+      return result;
+    };
+    const result =
+      name === "p16-store-busy" ? await heldWriter(directory, isolatedMcpEnv(directory), runVictim) : await runVictim();
     assert.equal(result.code, 0, result.stderr.toString("utf8"));
     // Product code reports native paths (as Python does on each OS). Only the test maps the
     // OS separator of the relative work root back to the Linux-generated oracle.

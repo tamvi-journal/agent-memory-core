@@ -13,7 +13,7 @@
     "tables"
   ],
   "scripts": {
-    "test": "node --experimental-strip-types --test test/encoding.test.ts test/conformance.test.ts test/review.test.ts test/authority-conformance.test.ts test/writes-conformance.test.ts test/writers.test.ts test/mcp-conformance.test.ts test/cli-conformance.test.ts test/cli-unit.test.ts",
+    "test": "node --experimental-strip-types --test test/encoding.test.ts test/conformance.test.ts test/review.test.ts test/authority-conformance.test.ts test/writes-conformance.test.ts test/writers.test.ts test/mcp-conformance.test.ts test/cli-conformance.test.ts test/cli-unit.test.ts test/r3-evidence.test.ts test/r3-busy.test.ts test/r3-idempotency.test.ts",
     "test:conformance": "node --experimental-strip-types --test test/conformance.test.ts test/authority-conformance.test.ts test/writes-conformance.test.ts test/mcp-conformance.test.ts test/cli-conformance.test.ts"
   }
 }

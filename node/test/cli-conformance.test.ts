@@ -18,6 +18,7 @@ import {
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { heldWriter } from "./held-writer.ts";
 import { DatabaseSync } from "node:sqlite";
 import {
   asArray,
@@ -185,25 +186,37 @@ for (const name of readdirSync(CORPUS)
             before.set(path + suffix, fileState(resolve(root, path + suffix)));
       }
     }
-    const child = spawn(
-      process.execPath,
-      [
-        "--experimental-strip-types",
-        resolve(ROOT, "node/test/cli/child.ts"),
-        resolve(scenario, "invocation.json"),
-        ...argv,
-      ],
-      { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] },
-    );
     const stdout: Buffer[] = [],
       stderr: Buffer[] = [];
-    child.stdout.on("data", (bytes) => stdout.push(Buffer.from(bytes)));
-    child.stderr.on("data", (bytes) => stderr.push(Buffer.from(bytes)));
-    child.stdin.end(readFileSync(resolve(scenario, "stdin")));
-    const code = await new Promise<number | null>((done, reject) => {
-      child.on("close", done);
-      child.on("error", reject);
-    });
+    const runVictim = async () => {
+      const bytes = name === "p16-store-busy" ? readFileSync(resolve(root, "store.sqlite3")) : null;
+      const start = performance.now();
+      const child = spawn(
+        process.execPath,
+        [
+          "--experimental-strip-types",
+          resolve(ROOT, "node/test/cli/child.ts"),
+          resolve(scenario, "invocation.json"),
+          ...argv,
+        ],
+        { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] },
+      );
+      child.stdout.on("data", (bytes) => stdout.push(Buffer.from(bytes)));
+      child.stderr.on("data", (bytes) => stderr.push(Buffer.from(bytes)));
+      child.stdin.end(readFileSync(resolve(scenario, "stdin")));
+      const code = await new Promise<number | null>((done, reject) => {
+        child.on("close", done);
+        child.on("error", reject);
+      });
+      if (name === "p16-store-busy") {
+        assert(performance.now() - start >= 4500);
+        assert.equal(code, 1);
+        assert.equal(Buffer.concat(stderr).toString(), "StoreBusy: store is busy; retry later\n");
+        assert.deepEqual(readFileSync(resolve(root, "store.sqlite3")), bytes);
+      }
+      return code;
+    };
+    const code = name === "p16-store-busy" ? await heldWriter(root, env, runVictim) : await runVictim();
     for (const [path, state] of before)
       assert.deepEqual(fileState(resolve(root, path)), state, `unchanged stat/bytes ${path}`);
     for (const [path, value] of Object.entries(expected.databases) as [string, any][]) {
@@ -216,8 +229,8 @@ for (const name of readdirSync(CORPUS)
           `backup ${path}`,
         );
         assert.equal(
-          statSync(full, { bigint: true }).mtimeNs,
-          statSync(resolve(root, value.source), { bigint: true }).mtimeNs,
+          statSync(full, { bigint: true }).mtimeNs / 1000n,
+          statSync(resolve(root, value.source), { bigint: true }).mtimeNs / 1000n,
           `backup mtime ${path}`,
         );
       } else if (value.class === "written") {
@@ -256,7 +269,9 @@ for (const name of readdirSync(CORPUS)
       }
     } else if (expected.comparison !== "help") assert.deepEqual(actualOut, expectedOut, "stdout bytes");
     if (expected.comparison === "usage") {
-      assert(actualErr.toString("utf8").trim().split(/\r?\n/u).at(-1)!.startsWith("trajecta-identity: error:"));
+      // §3.1b pins the oracle's raising parser, independently of argv routing.
+      const last = actualErr.toString("utf8").trim().split(/\r?\n/u).at(-1)!;
+      assert.equal(last.match(/^.*?: error:/u)?.[0], expectedErr.toString("utf8"));
     } else if (expected.comparison === "crash") assert(actualErr.length > 0);
     else assert.deepEqual(actualErr, expectedErr, "stderr bytes");
     assert.deepEqual(inventory(root), Object.keys(expected.tree).sort(compareCodePoint), "entire post-run tree");

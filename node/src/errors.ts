@@ -5,6 +5,13 @@ export class SchemaVersionError extends Error {
   }
 }
 
+export class StoreBusy extends Error {
+  constructor() {
+    super("store is busy; retry later");
+    this.name = "StoreBusy";
+  }
+}
+
 export class MigrationRequired extends SchemaVersionError {
   constructor(message: string) {
     super(message);

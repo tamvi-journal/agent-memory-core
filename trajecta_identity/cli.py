@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from memory_core import SchemaVersionError
-from memory_core.store import PinnedRecordError
+from memory_core.store import PinnedRecordError, StoreBusy
 from .authority import (HumanPresenceRequired, ConfirmationMismatch, ReceiptNotFound,
                         ReceiptIntegrityError, ProposalIntegrityError, ProposalDecided,
                         StaleAuthority)
@@ -15,7 +15,7 @@ from .identity import IdentityMemory
 
 PUBLIC_ERRORS = (HumanPresenceRequired, ConfirmationMismatch, ReceiptNotFound,
                  ReceiptIntegrityError, ProposalIntegrityError, ProposalDecided,
-                 StaleAuthority, SchemaVersionError, PinnedRecordError,
+                 StaleAuthority, SchemaVersionError, PinnedRecordError, StoreBusy,
                  WorkStoreError, FileExistsError, ValueError)
 from .paths import utf8_stdio
 from .paths import profile_search_dirs
